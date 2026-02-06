@@ -7,9 +7,24 @@ import axios from 'axios';
 // No, if user accesses localhost/Project/client/dist/, API is localhost/Project/api/public/
 // If in production, dynamically find the API based on current location
 // Logic: Application is in .../client/dist, API is in .../api/public
-const API_URL = import.meta.env.PROD
-    ? window.location.href.split('/client/dist')[0] + '/api/public'
-    : 'http://localhost:8000'; // Dev mode uses standalone PHP server
+const getApiUrl = () => {
+    // If we're on a production build (dist), use relative paths
+    if (import.meta.env.PROD) {
+        return window.location.origin + window.location.pathname.split('/client/dist')[0] + '/api/public';
+    }
+
+    // In DEV mode (Vite):
+    // 1. Check for environment variable
+    if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL;
+    }
+
+    // 2. Default to port 8000 for standard 'php -S localhost:8000 -t api/public'
+    // If you are using XAMPP for dev, change this to 'http://localhost/Python-Detective-Game/api/public'
+    return 'http://localhost:8000';
+};
+
+const API_URL = getApiUrl();
 
 const api = axios.create({
     baseURL: API_URL,
