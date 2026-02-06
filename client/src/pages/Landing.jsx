@@ -28,17 +28,22 @@ const Landing = () => {
             });
 
             // Feature cards scroll animation
-            gsap.from('.feature-card', {
-                scrollTrigger: {
-                    trigger: '.features-grid',
-                    start: 'top 80%',
-                },
-                y: 100,
-                opacity: 0,
-                duration: 0.8,
-                stagger: 0.2,
-                ease: 'back.out(1.7)'
-            });
+            gsap.fromTo('.feature-card',
+                { y: 100, opacity: 0 },
+                {
+                    scrollTrigger: {
+                        trigger: '.features-grid',
+                        start: 'top 85%',
+                        toggleActions: 'play none none none'
+                    },
+                    y: 0,
+                    opacity: 1,
+                    duration: 1,
+                    stagger: 0.2,
+                    ease: 'power3.out',
+                    overwrite: true
+                }
+            );
         }, containerRef);
 
         return () => ctx.revert();
@@ -133,7 +138,7 @@ const Landing = () => {
 
                         <div className="features-grid grid grid-cols-1 md:grid-cols-3 gap-8">
                             {features.map((feature, i) => (
-                                <GlassCard key={i} className="feature-card h-full" delay={feature.delay}>
+                                <GlassCard key={i} className="feature-card h-full" animate={false}>
                                     <div className="mb-6 p-3 w-fit rounded-xl bg-white/5 border border-white/10 group-hover:border-neon-purple/50 transition-colors">
                                         {feature.icon}
                                     </div>

@@ -1,12 +1,16 @@
 import { motion } from 'framer-motion';
 
-const GlassCard = ({ children, className = "", delay = 0 }) => {
+const GlassCard = ({ children, className = "", delay = 0, animate = true }) => {
+    const motionProps = animate ? {
+        initial: { opacity: 0, y: 20 },
+        whileInView: { opacity: 1, y: 0 },
+        transition: { duration: 0.8, delay, ease: "easeOut" },
+        viewport: { once: true }
+    } : {};
+
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, delay, ease: "easeOut" }}
-            viewport={{ once: true }}
+            {...motionProps}
             className={`glass-card p-8 rounded-2xl relative overflow-hidden group ${className}`}
         >
             {/* Animated Gradient Border Overlay */}
