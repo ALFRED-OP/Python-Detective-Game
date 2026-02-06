@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Ensure this matches your PHP backend URL
-const API_URL = 'http://localhost:8000/api/public'; // Assuming PHP built-in server
+const API_URL = 'http://localhost:8000'; // PHP Server root is /public
 
 const api = axios.create({
     baseURL: API_URL,
