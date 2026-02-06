@@ -6,7 +6,7 @@ import CodeEditor from '../components/CodeEditor';
 import EvidenceBoard from '../components/EvidenceBoard';
 import TerminalOutput from '../components/case/TerminalOutput';
 import CyberButton from '../components/common/CyberButton';
-import { Play, ArrowLeft, Loader2, Save } from 'lucide-react';
+import { Play, ArrowLeft, Loader2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 
@@ -137,15 +137,7 @@ const CaseView = () => {
                                 <span className="text-xs font-mono text-gray-400 ml-3">solution.py</span>
                             </div>
                             <div className="flex items-center space-x-2">
-                                <CyberButton
-                                    variant="ghost"
-                                    size="sm"
-                                    icon={Save}
-                                    onClick={() => { }}
-                                    className="!py-1 !px-2 text-xs"
-                                >
-                                    SAVE
-                                </CyberButton>
+
                                 <CyberButton
                                     variant="success"
                                     size="sm"
