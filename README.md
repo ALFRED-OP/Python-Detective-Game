@@ -1,113 +1,84 @@
-# Python Detective Game – Murder Mystery Programming Lab
+# 🕵️ Python Detective Game
+### *The Cyber-Noir Murder Mystery Programming Lab*
 
-## 🕵️ Project Overview
-**Python Detective Game** is an advanced educational puzzle game where players step into the shoes of a cyber-detective. Inspired by the *SQL Murder Mystery*, this game reimagines the concept for **Python programming**. Players must solve noir-themed murder mysteries by analyzing code evidence, predicting outputs, fixing bugs, and writing logic to uncover clues and catch the killer.
+[![Status](https://img.shields.io/badge/Status-Active_Investigation-neon-green)](https://github.com/ALFRED-OP/Python-Detective-Game)
+[![Tech](https://img.shields.io/badge/Stack-React_|_PHP_|_MySQL-neon-purple)](https://github.com/ALFRED-OP/Python-Detective-Game)
+[![Security](https://img.shields.io/badge/Sandbox-Python_3.x-neon-cyan)](https://github.com/ALFRED-OP/Python-Detective-Game)
 
-This is **NOT** a tutorial site. It is a logic-driven investigation lab designed to test deep understanding of Python mechanics, from basic variables to advanced algorithms.
+Welcome to the **Python Detective Game**, an immersive investigation experience where code analysis is your primary weapon. Step into the shoes of a cyber-noir detective, analyze corrupted scripts found at crime scenes, and fix logic gaps to catch killers.
 
-## 🚀 Core Features
-- **30 Unique Murder Mysteries**: Each case acts as a standalone coding puzzle wrapped in a detective narrative.
-- **Full Python Syllabus**: Progression from Variables -> Loops -> Functions -> Recursion -> Algorithms.
-- **Cyber-Noir Aesthetic**: A dark, immersive UI built with React and TailwindCSS.
-- **Real-time Code Execution**: Secure PHP-based execution engine to run and validate suspect code.
-- **Gamification**: XP system, Ranks (Rookie -> Master Detective), Leaderboards, and Achievements.
+---
 
-## 🛠️ Technology Stack
+## 🔍 The Detective's Handbook: How to Play
 
-### Frontend (Client)
-- **Framework**: ReactJS (Vite)
-- **Styling**: TailwindCSS (Custom Noir Palette: Neon Purple/Green on Dark Slate)
-- **State Management**: React Context API
-- **Code Editor**: Monaco Editor (VS Code core)
-- **HTTP Client**: Axios
+Solving a case requires more than just code; it requires **deduction**.
 
-### Backend (Server)
-- **Language**: PHP 8.0+
-- **Architecture**: REST API (Clean MVC structure)
-- **Database**: MySQL (Relational Schema)
-- **Execution Engine**: PHP `exec()` with timeout and input sanitization (Simulated Sandbox)
+### 1. The Investigation (Briefing)
+Start by reading the **Crime Scene Report**. Look for keywords like "Time of Death", "Transaction Price", or "Access Logs". These tell you **what** the correct code output should be.
 
-## 📂 Folder Structure
-```
-Python-Detective-Game/
-├── api/                  # PHP Backend API
-│   ├── config/           # Database configuration
-│   ├── controllers/      # Request handlers (Auth, Game Logic)
-│   ├── models/           # Data access layer
-│   └── public/           # API Entry point (index.php)
-├── client/               # React Frontend
-│   ├── src/
-│   │   ├── components/   # Reusable UI elements (EvidenceBoard, CodeEditor)
-│   │   └── pages/        # Game pages (Dashboard, CaseView)
-├── sql/                  # Database Schema & Seeds
-└── README.md             # Integration Manual
-```
+### 2. The Analysis (Suspects)
+Check the **Suspect Profiles**. Each suspect has a "Bio" that often hints at their coding style or motive. Some suspects are known for "chaotic variable names" or "skipping loops".
 
-## 🎮 How to Play
-1. **Login**: Create a detective profile.
-2. **Select a Case**: Start from *Case 001: The Variable Victim* and unlock harder cases.
-3. **Investigate**:
-    - Read the **Crime Scene Report**.
-    - Examine **Suspect Profiles**.
-    - Analyze the **Code Evidence** (e.g., a broken script found on the victim's laptop).
-4. **Solve**:
-    - Fix the code, predict the output, or write a script to filter the suspect list.
-    - Submit your solution to the **Execution Engine**.
-5. **Verdict**: If your code output matches the killer's signature, you solve the case and earn XP.
+### 3. The Evidence (Code)
+Examine the **Code Evidence** tab. This is usually a snippet of Python code found on a victim's device. 
+- **Identify the Bug**: Is there a `Type Error`? A `Loop Hole`? Or a missing `return`?
+- **Fix the Logic**: Edit the code in the **Cyber-Deck Editor** (the digital workspace on the right).
 
-## 💾 Installation & Setup
+### 4. The Verdict (Execution)
+Press **EXECUTE**.
+- The system will run your code in a secure sandbox.
+- **Match the Signature**: Your output must *exactly* match the "expected signature" (the truth).
+- Solve the case to earn **XP** and rise from a **Rookie** to a **Master Detective**.
+
+---
+
+## 💾 Installation & Setup (Developer Guide)
 
 ### Prerequisites
-- **PHP 8.0+** (Added to system PATH)
+- **PHP 8.0+**
 - **MySQL** (XAMPP recommended)
 - **Node.js & npm**
-- **Python 3.x** (Available in system PATH)
+- **Python 3.x** (Added to your system PATH)
 
 ### ⚡ Quick Start (Windows)
-We've provided automated scripts to get you running quickly:
+1. **Prepare Environment**: Double-click `INSTALL_ALL.bat`. (Wait for completion)
+2. **Setup Database**:
+   - Create a MySQL database named `python_detective`.
+   - Import `sql/schema.sql`.
+   - Import all files from the `sql/` folder to populate the 30 cases.
+3. **Launch API**: Double-click `RUN_BACKEND.bat`. (Keep terminal open)
+4. **Launch UI**: Double-click `RUN_FRONTEND.bat`. (Keep terminal open)
+5. **Access Hub**: Open `http://localhost:5173`.
 
-1. **Setup**: Double-click `INSTALL_ALL.bat`. This installs all frontend and backend dependencies.
-2. **Database**: 
-   - Ensure MySQL is running.
-   - Create a database named `python_detective`.
-   - Import `sql/schema.sql` and the seed files in `sql/`.
-3. **Run Backend**: Double-click `RUN_BACKEND.bat`. (Leaves terminal open)
-4. **Run Frontend**: Double-click `RUN_FRONTEND.bat`. (Leaves terminal open)
-5. **Play**: Open `http://localhost:5173`.
+---
 
-### 🛠️ Manual Configuration (Alternative)
+## 📂 Project Structure
+```text
+Python-Detective-Game/
+├── api/                  # PHP REST API (MVC Architecture)
+├── client/               # ReactJS Frontend (Vite + Tailwind v4)
+├── engine/               # Python Execution Sandbox (runner.py)
+├── sql/                  # Database Schemas & Mystery Seeds
+├── INSTALL_ALL.bat       # Setup Script
+├── RUN_BACKEND.bat       # API Runner
+└── RUN_FRONTEND.bat      # Vite Runner
+```
 
-#### 1. Database Setup
-1. Create a MySQL database named `python_detective`.
-2. Import `sql/schema.sql` to create tables.
-3. Import the seed files in `sql/` to populate cases.
+---
 
-#### 2. Backend Setup
-1. Navigate to `/api`.
-2. Configure `config/database.php` with your credentials.
-3. Start the PHP server: `php -S localhost:8000 -t public`.
+## 🛡️ Security & Sandbox Policy
+The engine executes user-provided code using a **Soft Sandbox** method:
+- **Restricted Imports**: `os`, `sys`, `subprocess`, and `socket` are blocked to prevent system intrusion.
+- **Execution Limits**: Each script is terminated after **2.0 seconds** to prevent infinite loops.
+- **Memory Safety**: Temporary files are instantly purged after execution.
 
-#### 3. Frontend Setup
-1. Navigate to `/client`.
-2. Install dependencies: `npm install`.
-3. Start the dev server: `npm run dev`.
+---
 
-
-## 🛡️ Security & Sandboxing
-The executing engine runs Python code in a controlled subprocess.
-- **Timeouts**: Logic runs for max 2 seconds to prevent infinite loops.
-- **Restrictions**: `os`, `sys`, and file I/O modules are blocked in the test environment to prevent system access.
-- **Production Note**: For a live public version, we recommend wrapping the execution in a **Docker** container.
-
-## 🏆 Scoring System
-- **Base XP**: Points based on difficulty (Easy: 100, Medium: 250, Hard: 500).
-- **Streak Bonus**: +10% per consecutive solved case.
-- **First Try Bonus**: +50 XP for solving without errors.
-
-## 🔮 Future Improvements
-- **Multiplayer Mode**: Co-op investigations.
-- **Story Editor**: Community-created cases.
-- **Visual Debugger**: Step-through execution visualization.
+## 🛠️ Troubleshooting
+- **Network Error**: Ensure `RUN_BACKEND.bat` is running and your database credentials in `api/config/database.php` are correct.
+- **Styling Issues**: Ensure you are using the latest `npm install` (via `INSTALL_ALL.bat`) as we use **Tailwind v4**.
+- **Python Not Recognized**: Ensure `python` is in your Windows Environment Variables (PATH).
 
 ---
 *Created for Advanced Level Project - Python Detective Game*
+

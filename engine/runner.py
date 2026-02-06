@@ -1,4 +1,5 @@
 import sys
+from typing import Any
 import subprocess
 import json
 import tempfile
@@ -8,7 +9,32 @@ import signal
 # Configuration
 TIMEOUT_SECONDS = 2.0
 
+# Security Blocklist
+DANGEROUS_TERMS = [
+    'os.', 'sys.', 'subprocess', 'shutil', 'socket', 'requests',
+    'eval(', 'exec(', 'open(', 'getattr(', 'setattr(', '__import__',
+    '__builtins__', 'pickle', 'pty'
+]
+
+def is_safe(code):
+    """Basic structural check for dangerous commands."""
+    code_clean = code.strip().lower()
+    for term in DANGEROUS_TERMS:
+        if term in code_clean:
+            return False, f"Restricted command detected: {term}"
+    return True, None
+
 def run_code(code):
+    # Security Pre-check
+    safe, error_msg = is_safe(code)
+    if not safe:
+        return {
+            "stdout": "",
+            "stderr": f"SECURITY ALERT: {error_msg}\nAccess to this module/function is restricted in the Detective Sandbox.",
+            "error": "Security Violation",
+            "timeout": False
+        }
+
     try:
         # Create a temporary file to hold the code
         with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as tmp:
@@ -20,7 +46,7 @@ def run_code(code):
         # Production would require Docker/capabilities dropping.
         
         # We start the subprocess
-        start_data = {
+        start_data: dict[str, Any] = {
             "stdout": "",
             "stderr": "",
             "error": None,
