@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Clock, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Clock, ChevronRight, Lock, Unlock, CheckCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 
 const CaseCard = ({ caseData, index }) => {
-    const isLocked = false; // Logic for locking can be added later
+    const isLocked = false;
+    const isSolved = Boolean(parseInt(caseData.is_completed));
 
     const variants = {
         hidden: { opacity: 0, y: 20 },
@@ -27,26 +28,36 @@ const CaseCard = ({ caseData, index }) => {
                 <div className={clsx(
                     "h-full bg-noir-800/80 backdrop-blur-sm border border-white/5 rounded-xl overflow-hidden relative transition-all duration-300",
                     "group-hover:border-neon-purple/50 group-hover:shadow-[0_0_20px_rgba(176,38,255,0.15)]",
-                    isLocked && "opacity-60 grayscale cursor-not-allowed"
+                    isLocked && "opacity-60 grayscale cursor-not-allowed",
+                    isSolved && "border-neon-green/30"
                 )}>
                     {/* Decorative Top Bar */}
                     <div className={clsx(
                         "h-1 w-full",
-                        caseData.difficulty === 'Easy' ? "bg-neon-green" :
-                            caseData.difficulty === 'Medium' ? "bg-neon-cyan" :
-                                "bg-neon-pink"
+                        isSolved ? "bg-neon-green" : (
+                            caseData.difficulty === 'Easy' ? "bg-neon-green" :
+                                caseData.difficulty === 'Medium' ? "bg-neon-cyan" :
+                                    "bg-neon-pink"
+                        )
                     )} />
 
                     <div className="p-6 relative z-10">
                         <div className="flex justify-between items-start mb-4">
-                            <span className={clsx(
-                                "px-2 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider border",
-                                caseData.difficulty === 'Easy' ? "bg-neon-green/10 text-neon-green border-neon-green/30" :
-                                    caseData.difficulty === 'Medium' ? "bg-neon-cyan/10 text-neon-cyan border-neon-cyan/30" :
-                                        "bg-neon-pink/10 text-neon-pink border-neon-pink/30"
-                            )}>
-                                {caseData.difficulty}
-                            </span>
+                            <div className="flex gap-2">
+                                <span className={clsx(
+                                    "px-2 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider border",
+                                    caseData.difficulty === 'Easy' ? "bg-neon-green/10 text-neon-green border-neon-green/30" :
+                                        caseData.difficulty === 'Medium' ? "bg-neon-cyan/10 text-neon-cyan border-neon-cyan/30" :
+                                            "bg-neon-pink/10 text-neon-pink border-neon-pink/30"
+                                )}>
+                                    {caseData.difficulty}
+                                </span>
+                                {isSolved && (
+                                    <span className="flex items-center gap-1 bg-neon-green/20 text-neon-green px-2 py-1 rounded text-[10px] font-mono font-bold border border-neon-green/40 uppercase">
+                                        <CheckCircle size={10} /> SOLVED
+                                    </span>
+                                )}
+                            </div>
                             <span className="text-noir-600 font-mono font-bold text-2xl group-hover:text-white/20 transition-colors">
                                 #{String(caseData.id).padStart(3, '0')}
                             </span>

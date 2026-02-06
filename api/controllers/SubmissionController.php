@@ -32,42 +32,36 @@ class SubmissionController
 
         // 2. Run Python Code
         $runnerPath = realpath(__DIR__ . '/../../engine/runner.py');
-        $pythonCmd = "python"; // Assume 'python' is in PATH. Adjust if 'python3' needed.
+        $pythonCmd = "python";
 
-        // Construct payload
         $payload = json_encode(['code' => $code]);
-
-        // Use descriptorspec to pass stdin
         $descriptorspec = [
-            0 => ["pipe", "r"], // stdin
-            1 => ["pipe", "w"], // stdout
-            2 => ["pipe", "w"] // stderr
+            0 => ["pipe", "r"],
+            1 => ["pipe", "w"],
+            2 => ["pipe", "w"]
         ];
 
+        $startTime = microtime(true);
         $process = proc_open("$pythonCmd \"$runnerPath\"", $descriptorspec, $pipes);
 
         $executionResult = [];
 
         if (is_resource($process)) {
-            // Write to stdin
             fwrite($pipes[0], $payload);
             fclose($pipes[0]);
 
-            // Read stdout
             $stdout = stream_get_contents($pipes[1]);
             fclose($pipes[1]);
 
-            // Read stderr
             $stderr = stream_get_contents($pipes[2]);
             fclose($pipes[2]);
 
             $return_value = proc_close($process);
+            $endTime = microtime(true);
+            $exec_time = round($endTime - $startTime, 4);
 
-            // Parse Runner JSON Output
-            // runner.py prints json to stdout
             $executionResult = json_decode($stdout, true);
 
-            // If json decode fails (maybe runner crashed or printed garbage), fallback
             if (!$executionResult) {
                 $executionResult = [
                     'stdout' => $stdout,
@@ -77,6 +71,7 @@ class SubmissionController
             }
         }
         else {
+            $exec_time = 0;
             $executionResult = ['error' => 'Failed to start runner process'];
         }
 
@@ -85,11 +80,9 @@ class SubmissionController
         $user_output = trim($executionResult['stdout'] ?? '');
         $expected = trim($caseData['expected_output']);
 
-        // Normalize line endings
         $user_output = str_replace("\r\n", "\n", $user_output);
         $expected = str_replace("\r\n", "\n", $expected);
 
-        // Check for runtime errors
         if (!empty($executionResult['error'])) {
             $status = 'Error';
         }
@@ -97,10 +90,8 @@ class SubmissionController
             $status = 'Passed';
         }
 
-        // 4. Save Submission
+        // 4. Save Submission & Draft
         $submissionModel = new SubmissionModel($this->conn);
-        $exec_time = 0.5; // Placeholder, or calculate from start/end time of proc_open
-
         $submissionModel->create(
             $user_id,
             $case_id,
@@ -109,6 +100,9 @@ class SubmissionController
             $user_output . ($executionResult['stderr'] ? "\nSTDERR: " . $executionResult['stderr'] : ""),
             $exec_time
         );
+
+        // Always save latest attempt as draft
+        $submissionModel->saveDraft($user_id, $case_id, $code);
 
         // 5. Update Progress & XP if passed
         $xp_gained = 0;
@@ -131,7 +125,8 @@ class SubmissionController
             'stderr' => $executionResult['stderr'] ?? null,
             'expected' => $expected,
             'xp_gained' => $xp_gained,
-            'first_completion' => $first_completion
+            'first_completion' => $first_completion,
+            'execution_time' => $exec_time
         ]);
     }
 

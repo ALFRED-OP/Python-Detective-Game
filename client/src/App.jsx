@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import CaseView from './pages/CaseView';
 import Leaderboard from './pages/Leaderboard';
+import AdminDashboard from './pages/AdminDashboard';
 
 // Components
 import Layout from './components/common/Layout';
@@ -51,6 +52,14 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Leaderboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <Layout>
+                <AdminDashboard />
               </Layout>
             </ProtectedRoute>
           } />

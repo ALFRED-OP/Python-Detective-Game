@@ -12,15 +12,17 @@ class CaseController
 
     public function getAllCases()
     {
+        $user_id = $_GET['user_id'] ?? null;
         $case = new CaseModel($this->conn);
-        $result = $case->getAll();
+        $result = $case->getAll($user_id);
         sendJson($result);
     }
 
     public function getCase($id)
     {
+        $user_id = $_GET['user_id'] ?? null;
         $case = new CaseModel($this->conn);
-        $result = $case->getById($id);
+        $result = $case->getById($id, $user_id);
 
         if ($result) {
             // Decode JSON fields for the frontend
@@ -31,21 +33,34 @@ class CaseController
                 'hint_2' => $result['hint_2']
             ];
 
-            // Remove raw JSON strings and secrets if necessary
-            // For now, keeping everything but maybe hiding hidden_test_code could be wise?
-            // Actually, we NEVER send hidden_test_code to the client. That's for the backend only.
-            unset($result['hidden_test_code']);
-            unset($result['expected_output']); // Maybe hide this too? The user should not see the expected output directly in the API response?
-            // Actually, for "expected output", sometimes it's shown in the UI "Target Output". But for "hidden test code", definitely hide.
-            // Let's keep expected_output as it's often part of the problem description "Make it print X".
+            // If user has saved code (draft), we send it. 
+            $result['draft_code'] = $result['saved_code'] ?? null;
 
+            unset($result['hidden_test_code']);
+            unset($result['expected_output']);
             unset($result['suspects_json']);
             unset($result['evidence_json']);
+            unset($result['saved_code']);
 
             sendJson($result);
         }
         else {
             sendJson(['error' => 'Case not found'], 404);
+        }
+    }
+
+    public function addCase($data)
+    {
+        if (!isset($data['title']) || !isset($data['starting_code'])) {
+            sendJson(['error' => 'Missing required fields'], 400);
+        }
+
+        $case = new CaseModel($this->conn);
+        if ($case->create($data)) {
+            sendJson(['message' => 'New case file archived successfully']);
+        }
+        else {
+            sendJson(['error' => 'Failed to archive case file'], 503);
         }
     }
 }

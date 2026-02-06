@@ -71,6 +71,11 @@ elseif ($resource === 'cases') {
         // Get all cases (list)
         $caseController->getAllCases();
     }
+    elseif ($method === 'POST' && $action === null) {
+        // Create new case
+        $data = getJsonInput();
+        $caseController->addCase($data);
+    }
     else {
         sendJson(['error' => 'Invalid Case Endpoint'], 404);
     }

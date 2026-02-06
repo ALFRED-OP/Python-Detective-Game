@@ -4,15 +4,20 @@ import { motion } from 'framer-motion';
 import CaseCard from '../components/dashboard/CaseCard';
 import DashboardScene from '../components/dashboard/DashboardScene';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Dashboard = () => {
     const [cases, setCases] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const { user } = useAuth();
+
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await api.get('/cases');
+                const res = await api.get('/cases', {
+                    params: { user_id: user?.id }
+                });
                 setCases(res.data);
             } catch (err) {
                 console.error(err);
@@ -21,7 +26,7 @@ const Dashboard = () => {
             }
         };
         fetchData();
-    }, []);
+    }, [user?.id]);
 
     const containerVariants = {
         hidden: { opacity: 0 },

@@ -21,12 +21,19 @@ const CaseView = () => {
     const [status, setStatus] = useState('idle'); // idle, running, passed, failed, error
     const [loading, setLoading] = useState(true);
 
+    const [execTime, setExecTime] = useState(null);
+
     useEffect(() => {
         const fetchCase = async () => {
             try {
-                const res = await api.get(`/cases/${id}`);
+                const res = await api.get(`/cases/${id}`, {
+                    params: { user_id: user?.id }
+                });
                 setCaseData(res.data);
-                setCode(res.data.starting_code.replace(/\\n/g, '\n'));
+
+                // If there's a draft, use it. Otherwise use starting_code.
+                const initialCode = res.data.draft_code || res.data.starting_code;
+                setCode(initialCode.replace(/\\n/g, '\n'));
             } catch (err) {
                 console.error(err);
                 setOutput("Error loading case file. Connection terminated.");
@@ -35,22 +42,25 @@ const CaseView = () => {
             }
         };
         fetchCase();
-    }, [id]);
+    }, [id, user?.id]);
 
     const handleSubmit = async () => {
         setStatus('running');
+        setExecTime(null);
         setOutput('Initializing sandbox environment...\nExecuting trace...\n');
 
         try {
             const res = await api.post('/submit', {
-                user_id: user.id,
+                user_id: user?.id,
                 case_id: id,
                 code: code
             });
 
             const data = res.data;
+            if (data.execution_time) setExecTime(data.execution_time);
 
             if (data.status === 'Passed') {
+                // ... existing Passed logic
                 setStatus('passed');
                 setOutput(data.output);
                 if (data.first_completion) {
@@ -102,8 +112,15 @@ const CaseView = () => {
                     <ArrowLeft size={16} className="mr-2 group-hover:-translate-x-1 transition-transform" />
                     RETURN TO DASHBOARD
                 </button>
-                <div className="text-xs text-gray-500 font-mono">
-                    CASE ID: <span className="text-white">#{id}</span> // STATUS: <span className="text-neon-cyan">ACTIVE</span>
+                <div className="text-xs text-gray-500 font-mono flex items-center gap-4">
+                    {execTime !== null && (
+                        <div className="text-neon-green/80 flex items-center gap-1 bg-neon-green/5 px-2 py-0.5 rounded border border-neon-green/20">
+                            <Clock size={10} /> EXECUTION: {execTime}s
+                        </div>
+                    )}
+                    <div>
+                        CASE ID: <span className="text-white">#{id}</span> // STATUS: <span className="text-neon-cyan">ACTIVE</span>
+                    </div>
                 </div>
             </div>
 
