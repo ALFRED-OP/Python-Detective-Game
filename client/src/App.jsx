@@ -7,6 +7,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import CaseView from './pages/CaseView';
 import Leaderboard from './pages/Leaderboard';
+import Landing from './pages/Landing';
 
 // Components
 import Layout from './components/common/Layout';
@@ -16,6 +17,12 @@ const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
   return children;
+};
+
+// Handle root path: Show landing if not auth'd, else go to dashboard
+const HomeRedirect = () => {
+  const { user } = useAuth();
+  return user ? <Navigate to="/dashboard" replace /> : <Landing />;
 };
 
 function App() {
@@ -28,10 +35,11 @@ function App() {
     <Router basename={basename}>
       <AuthProvider>
         <Routes>
+          <Route path="/" element={<HomeRedirect />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 
-          <Route path="/" element={
+          <Route path="/dashboard" element={
             <ProtectedRoute>
               <Layout>
                 <Dashboard />
