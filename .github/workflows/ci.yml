@@ -1,0 +1,95 @@
+name: Python Detective Game CI
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main", "develop" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: detective_game
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      # ----------------------------
+      # CHECKOUT (VALID SHA)
+      # ----------------------------
+      - name: Checkout repository
+        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+
+      # ----------------------------
+      # README VALIDATION
+      # ----------------------------
+      - name: Validate README.md
+        run: |
+          test -f README.md
+          test -s README.md
+
+      # ----------------------------
+      # NODE / FRONTEND
+      # ----------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@60f7e98b3cfa2e4b2e7d3b7c91c93b1e5d7f5a73
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # ----------------------------
+      # PHP BACKEND
+      # ----------------------------
+      - name: Setup PHP
+        uses: shivammathur/setup-php@2e5e9b9c1b5c9e9b0c4dbd7db4c0a5e5a3d1a7d3
+        with:
+          php-version: 8.2
+          extensions: mbstring, pdo, pdo_mysql
+          coverage: none
+
+      - name: Validate PHP syntax
+        working-directory: backend
+        run: |
+          find . -type f -name "*.php" -print0 | xargs -0 -n1 php -l
+
+      # ----------------------------
+      # DATABASE
+      # ----------------------------
+      - name: Validate database schema
+        run: |
+          for file in database/*.sql; do
+            mysql -h 127.0.0.1 -uroot -proot detective_game < "$file"
+          done
+
+      # ----------------------------
+      # PYTHON ENGINE
+      # ----------------------------
+      - name: Setup Python
+        uses: actions/setup-python@82c7d41c9e6f9dcb5b5c1e5e0c6a6b1e4b6e8c22
+        with:
+          python-version: "3.12"
+
+      - name: Validate Python syntax
+        working-directory: engine
+        run: python -m compileall .
+
+      - name: CI completed
+        run: echo "CI passed successfully"
