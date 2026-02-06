@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS user_progress (
     case_id INT NOT NULL,
     completed BOOLEAN DEFAULT FALSE,
     best_time FLOAT,
+    saved_code MEDIUMTEXT DEFAULT NULL,
+    status ENUM('locked', 'unlocked', 'completed') DEFAULT 'locked',
     completed_at TIMESTAMP,
     PRIMARY KEY (user_id, case_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

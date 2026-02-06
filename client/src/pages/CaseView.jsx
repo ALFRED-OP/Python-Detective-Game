@@ -20,22 +20,72 @@ const CaseView = () => {
     const [output, setOutput] = useState('');
     const [status, setStatus] = useState('idle'); // idle, running, passed, failed, error
     const [loading, setLoading] = useState(true);
+    const [saveStatus, setSaveStatus] = useState('idle'); // idle, saving, saved, error
 
     useEffect(() => {
         const fetchCase = async () => {
             try {
-                const res = await api.get(`/cases/${id}`);
-                setCaseData(res.data);
-                setCode(res.data.starting_code.replace(/\\n/g, '\n'));
+                const params = user ? { user_id: user.id } : {};
+                const res = await api.get(`/cases/${id}`, { params });
+                const data = res.data;
+
+                setCaseData(data);
+
+                // Priority: Protected Draft > Starting Code
+                if (data.saved_code) {
+                    setCode(data.saved_code);
+                } else {
+                    setCode(data.starting_code.replace(/\\n/g, '\n'));
+                }
             } catch (err) {
                 console.error(err);
+                if (err.response?.status === 403) {
+                    navigate('/'); // Case is locked
+                }
                 setOutput("Error loading case file. Connection terminated.");
             } finally {
                 setLoading(false);
             }
         };
-        fetchCase();
-    }, [id]);
+        if (user) fetchCase();
+    }, [id, user, navigate]);
+
+    // Debounced Autosave
+    useEffect(() => {
+        if (!caseData || caseData.status === 'completed' || !user) return;
+
+        const timer = setTimeout(async () => {
+            setSaveStatus('saving');
+            try {
+                await api.post(`/cases/${id}/save`, {
+                    user_id: user.id,
+                    code: code
+                });
+                setSaveStatus('saved');
+                setTimeout(() => setSaveStatus('idle'), 2000);
+            } catch (err) {
+                console.error("Autosave failed", err);
+                setSaveStatus('error');
+            }
+        }, 5000); // 5 second debounce
+
+        return () => clearTimeout(timer);
+    }, [code, id, user, caseData]);
+
+    const handleSave = async () => {
+        if (!user) return;
+        setSaveStatus('saving');
+        try {
+            await api.post(`/cases/${id}/save`, {
+                user_id: user.id,
+                code: code
+            });
+            setSaveStatus('saved');
+            setTimeout(() => setSaveStatus('idle'), 2000);
+        } catch (err) {
+            setSaveStatus('error');
+        }
+    };
 
     const handleSubmit = async () => {
         setStatus('running');
@@ -53,6 +103,9 @@ const CaseView = () => {
             if (data.status === 'Passed') {
                 setStatus('passed');
                 setOutput(data.output);
+                // Refresh local data to show completion
+                setCaseData(prev => ({ ...prev, status: 'completed' }));
+
                 if (data.first_completion) {
                     refreshUser(data.xp_gained);
                     confetti({
@@ -103,9 +156,27 @@ const CaseView = () => {
                     RETURN TO DASHBOARD
                 </button>
                 <div className="text-xs text-gray-500 font-mono">
-                    CASE ID: <span className="text-white">#{id}</span> // STATUS: <span className="text-neon-cyan">ACTIVE</span>
+                    CASE ID: <span className="text-white">#{id}</span> // STATUS: <span className={caseData.status === 'completed' ? "text-neon-green" : "text-neon-cyan"}>
+                        {caseData.status === 'completed' ? "SOLVED" : "ACTIVE"}
+                    </span>
                 </div>
             </div>
+
+            {/* Resolved Banner */}
+            {caseData.status === 'completed' && (
+                <motion.div
+                    initial={{ scaleY: 0 }}
+                    animate={{ scaleY: 1 }}
+                    className="bg-neon-green/10 border border-neon-green/30 p-2 text-center rounded-lg"
+                >
+                    <span className="text-neon-green font-mono text-sm font-bold tracking-[0.2em] animate-pulse">
+                        ★ CASE SOLVED ★
+                    </span>
+                    <span className="text-neon-green/60 font-mono text-xs ml-4 uppercase tracking-wider">
+                        Review mode active. No additional XP will be awarded.
+                    </span>
+                </motion.div>
+            )}
 
             <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
                 {/* LEFT PANEL: Evidence & Story */}
@@ -135,14 +206,30 @@ const CaseView = () => {
                                     <span className="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
                                 </div>
                                 <span className="text-xs font-mono text-gray-400 ml-3">solution.py</span>
+
+                                {/* Save Status Indicator */}
+                                {saveStatus !== 'idle' && (
+                                    <div className={clsx(
+                                        "text-[10px] font-mono ml-4 px-2 py-0.5 rounded transition-all duration-300 translate-y-[1px]",
+                                        saveStatus === 'saving' ? "text-neon-cyan animate-pulse bg-neon-cyan/10" :
+                                            saveStatus === 'saved' ? "text-neon-green bg-neon-green/10" :
+                                                "text-neon-pink bg-neon-pink/10"
+                                    )}>
+                                        {saveStatus === 'saving' && "// SYNCING..."}
+                                        {saveStatus === 'saved' && "// DRAFT SYNCED"}
+                                        {saveStatus === 'error' && "// SYNC FAILED"}
+                                    </div>
+                                )}
                             </div>
                             <div className="flex items-center space-x-2">
                                 <CyberButton
                                     variant="ghost"
                                     size="sm"
                                     icon={Save}
-                                    onClick={() => { }}
+                                    onClick={handleSave}
                                     className="!py-1 !px-2 text-xs"
+                                    isLoading={saveStatus === 'saving'}
+                                    disabled={caseData.status === 'completed'}
                                 >
                                     SAVE
                                 </CyberButton>
