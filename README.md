@@ -58,30 +58,40 @@ Python-Detective-Game/
 ## 💾 Installation & Setup
 
 ### Prerequisites
-- **PHP 8.0+**
-- **MySQL**
+- **PHP 8.0+** (Added to system PATH)
+- **MySQL** (XAMPP recommended)
 - **Node.js & npm**
 - **Python 3.x** (Available in system PATH)
 
-### 1. Database Setup
+### ⚡ Quick Start (Windows)
+We've provided automated scripts to get you running quickly:
+
+1. **Setup**: Double-click `INSTALL_ALL.bat`. This installs all frontend and backend dependencies.
+2. **Database**: 
+   - Ensure MySQL is running.
+   - Create a database named `python_detective`.
+   - Import `sql/schema.sql` and the seed files in `sql/`.
+3. **Run Backend**: Double-click `RUN_BACKEND.bat`. (Leaves terminal open)
+4. **Run Frontend**: Double-click `RUN_FRONTEND.bat`. (Leaves terminal open)
+5. **Play**: Open `http://localhost:5173`.
+
+### 🛠️ Manual Configuration (Alternative)
+
+#### 1. Database Setup
 1. Create a MySQL database named `python_detective`.
 2. Import `sql/schema.sql` to create tables.
-3. Import `sql/seeds.sql` to populate the 30 cases.
+3. Import the seed files in `sql/` to populate cases.
 
-### 2. Backend Setup
+#### 2. Backend Setup
 1. Navigate to `/api`.
-2. Configure `config/db.php` with your MySQL credentials.
-3. Start the PHP server:
-   ```bash
-   cd api
-   php -S localhost:8000 -t public public/index.php
-   ```
+2. Configure `config/database.php` with your credentials.
+3. Start the PHP server: `php -S localhost:8000 -t public`.
 
-### 3. Frontend Setup
+#### 3. Frontend Setup
 1. Navigate to `/client`.
 2. Install dependencies: `npm install`.
 3. Start the dev server: `npm run dev`.
-4. Open the displayed URL (e.g., `http://localhost:5173`).
+
 
 ## 🛡️ Security & Sandboxing
 The executing engine runs Python code in a controlled subprocess.
