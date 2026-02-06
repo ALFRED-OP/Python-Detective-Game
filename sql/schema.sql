@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS user_progress (
     user_id INT NOT NULL,
     case_id INT NOT NULL,
     completed BOOLEAN DEFAULT FALSE,
+    saved_code TEXT,
     best_time FLOAT,
     completed_at TIMESTAMP,
     PRIMARY KEY (user_id, case_id),
