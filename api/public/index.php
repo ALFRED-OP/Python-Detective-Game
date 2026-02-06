@@ -10,12 +10,17 @@ handleCors();
 
 // Basic Router
 $method = $_SERVER['REQUEST_METHOD'];
-$uri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-$uriParts = explode('/', trim($uri, '/'));
 
-// Expected URI format: /api/public/{resource}/{id_or_action}
-// Adjust based on server config. Assuming server points to /api/public/
-// If running with `php -S localhost:8000 -t api/public` then URI is just /{resource}
+// Get the current script directory (e.g., /project/api/public)
+$scriptDir = dirname($_SERVER['SCRIPT_NAME']);
+$requestUri = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+
+// If the URI starts with the script directory, strip it to get the relative path
+if (strpos($requestUri, $scriptDir) === 0) {
+    $requestUri = substr($requestUri, strlen($scriptDir));
+}
+
+$uriParts = explode('/', trim($requestUri, '/'));
 
 $resource = isset($uriParts[0]) ? $uriParts[0] : null;
 $action = isset($uriParts[1]) ? $uriParts[1] : null;
