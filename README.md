@@ -28,8 +28,28 @@ Examine the **Code Evidence** tab. This is usually a snippet of Python code foun
 ### 4. The Verdict (Execution)
 Press **EXECUTE**.
 - The system will run your code in a secure sandbox.
-- **Match the Signature**: Your output must *exactly* match the "expected signature" (the truth).
-- Solve the case to earn **XP** and rise from a **Rookie** to a **Master Detective**.
+- **Match the Signature**: Your output must *exactly* match the "expected signature".
+- **Solved Badges**: Once a case is solved, a high-contrast **SOLVED** badge will appear on your HQ dashboard.
+- **Rank Promotion**: Rise from a **Rookie** to a **Master Detective** based on your total XP.
+
+---
+
+## 🚀 Advanced Technical Features
+
+Elevating the investigation experience with professional-grade tools:
+- **Dynamic Detective Ranking**: Automated rank promotion system (Rookie → Junior → Specialist → Senior → Master).
+- **Code Draft Persistence**: Your code edits are automatically saved to the database. Never lose an investigation.
+- **Precise Execution Metrics**: View execution time in milliseconds for every code execution.
+- **Visual Progress Tracking**: Real-time status indicators on the Case Files dashboard.
+
+---
+
+## 🔐 Administrative Access: Case Manager
+
+The project includes a professional **Case Archive Manager** for adding new mystery cases without manual SQL:
+1.  **Access Hub**: Navigate to `/admin` in your browser.
+2.  **Archive Case**: Fill out the Crime Briefing, Starting Code (Evidence), and Expected Output.
+3.  **Deploy**: Click "Archive Case File" to instantly add the mystery to the live game.
 
 ---
 
@@ -55,14 +75,14 @@ Press **EXECUTE**.
 
 ## 📂 Project Structure
 ```text
-Python-Detective-Game/
-├── api/                  # PHP REST API (MVC Architecture)
-├── client/               # ReactJS Frontend (Vite + Tailwind v4)
-├── engine/               # Python Execution Sandbox (runner.py)
+├── api/                  # PHP REST API (Ranking & Persistence Logic)
+├── client/               # ReactJS Frontend (Admin Panel & Dashboard)
+├── engine/               # Hardened Python Sandbox (runner.py)
 ├── sql/                  # Database Schemas & Mystery Seeds
-├── INSTALL_ALL.bat       # Setup Script
-├── RUN_BACKEND.bat       # API Runner
-└── RUN_FRONTEND.bat      # Vite Runner
+├── maintenance/          # Internal debug & maintenance scripts
+├── INSTALL_ALL.bat       # Automatic environment setup
+├── RUN_BACKEND.bat       # API & Backend Runner
+└── RUN_FRONTEND.bat      # Frontend UI Runner
 ```
 
 ---

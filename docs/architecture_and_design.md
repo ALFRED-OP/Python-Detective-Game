@@ -26,7 +26,9 @@ graph TD
         UC5[Write & Execute Python Code]
         UC6[Submit Verdict]
         UC7[View Global Leaderboard]
-        UC8[Manage Cases]
+        UC8[Admin: Archive New Case Files]
+        UC9[Persistence: Auto-save Drafts]
+        UC10[Rewards: XP & Rank Promotions]
     end
 
     Investigator --> UC1
@@ -36,6 +38,8 @@ graph TD
     Investigator --> UC5
     Investigator --> UC6
     Investigator --> UC7
+    Investigator --> UC9
+    Investigator --> UC10
     
     Admin --> UC8
 ```
@@ -92,14 +96,18 @@ classDiagram
     }
 
     class CaseModel {
-        +getAll() array
-        +getById(id) array
+        +getAll(user_id) array
+        +getById(id, user_id) array
+        +create(data) bool
     }
 
     class SubmissionModel {
-        +create(user_id, case_id, code, status, output)
+        +create(user_id, case_id, code, status, output, exec_time)
+        +saveDraft(user_id, case_id, code) bool
+        +updateUserXp(user_id, xp_gain)
+        +updateRankTitle(user_id)
         +getLeaderboard() array
-        +markCaseCompleted(user_id, case_id) bool
+        +markCaseCompleted(user_id, case_id, time_taken) bool
     }
 
     class Database {
@@ -130,16 +138,20 @@ sequenceDiagram
     User->>API: POST /submit (code, case_id)
     API->>DB: Fetch Expected Output for Case
     DB-->>API: Return Expected Output
+    API->>API: Start Timer (microtime)
     API->>Engine: Start Subprocess (proc_open)
     Engine->>Engine: Validate Code (is_safe)
     Engine->>Engine: Execute Script (Timeout = 2s)
     Engine-->>API: Return Output (STDOUT/STDERR)
+    API->>API: Stop Timer & Calc Execution Time
     API->>API: Compare User Output with Expected
+    API->>DB: Save Draft Persistence (saved_code)
     alt Solution Correct
-        API->>DB: Update User XP & Mark Case Solved
+        API->>DB: Update User XP & Recalculate Rank
+        API->>DB: Mark Case Solved & Store Best Time
         DB-->>API: Success
     end
-    API-->>User: Return Verdict (Passed/Failed/Error)
+    API-->>User: Return Verdict + Execution Time
 ```
 
 ---
@@ -211,6 +223,19 @@ graph TD
 - **Phase 3: Sandbox Engineering**: Creating `runner.py` with security restrictions.
 - **Phase 4: Frontend Immersive UI**: React + Tailwind v4 + Framer Motion.
 - **Phase 5: Content Creation**: Seeding the 30 logical cases.
+- **Phase 6: Advanced Overhaul**: Implementing Administrative panel, Persistence, and Precise Execution Metrics.
+
+---
+
+## 9. Technical Specifications: Major Enhancements
+### 9.1 Administrative Subsystem
+Built using a custom `AdminDashboard` component, allowing dynamic expansion of the mystery archive via RESTful API.
+
+### 9.2 Persistence Layer
+Employs a `saved_code` column in the `user_progress` table, ensuring the **Cyber-Noir** immersive experience is preserved across sessions. 
+
+### 9.3 Performance Metric Engine
+Utilizes high-resolution PHP `microtime` and automated rank calculation triggers within `SubmissionModel`.
 
 ---
 
