@@ -71,11 +71,6 @@ elseif ($resource === 'cases') {
         // Get all cases (list)
         $caseController->getAllCases();
     }
-    elseif ($method === 'POST' && $action !== null && $uriParts[2] === 'save') {
-        // Save case draft
-        $data = getJsonInput();
-        $caseController->saveDraft($action, $data);
-    }
     else {
         sendJson(['error' => 'Invalid Case Endpoint'], 404);
     }

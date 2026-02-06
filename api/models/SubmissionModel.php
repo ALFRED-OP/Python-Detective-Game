@@ -51,53 +51,27 @@ class SubmissionModel
 
     public function markCaseCompleted($user_id, $case_id, $time_taken)
     {
-        // 1. Update current case status to 'completed' and clear saved_code
-        $query = "INSERT INTO user_progress (user_id, case_id, completed, best_time, status, saved_code, completed_at) 
-                  VALUES (:user_id, :case_id, 1, :time, 'completed', NULL, NOW())
-                  ON DUPLICATE KEY UPDATE 
-                  completed = 1, 
-                  best_time = LEAST(best_time, :time_update), 
-                  status = 'completed', 
-                  saved_code = NULL,
-                  completed_at = NOW()";
-
-        $stmt = $this->conn->prepare($query);
-        $stmt->bindParam(':user_id', $user_id);
-        $stmt->bindParam(':case_id', $case_id);
-        $stmt->bindParam(':time', $time_taken);
-        $stmt->bindParam(':time_update', $time_taken);
+        // Check if already completed
+        $check = "SELECT * FROM user_progress WHERE user_id = ? AND case_id = ?";
+        $stmt = $this->conn->prepare($check);
+        $stmt->bindParam(1, $user_id);
+        $stmt->bindParam(2, $case_id);
         $stmt->execute();
 
-        $rowsAffected = $stmt->rowCount();
-
-        // 2. Unlock the next case
-        $nextCaseQuery = "SELECT id FROM cases WHERE id > :case_id ORDER BY id ASC LIMIT 1";
-        $nstmt = $this->conn->prepare($nextCaseQuery);
-        $nstmt->bindParam(':case_id', $case_id);
-        $nstmt->execute();
-        $nextCase = $nstmt->fetch(PDO::FETCH_ASSOC);
-
-        if ($nextCase) {
-            $next_id = $nextCase['id'];
-            // Check if already unlocked/completed
-            $ucheck = "SELECT status FROM user_progress WHERE user_id = :user_id AND case_id = :next_id";
-            $ustmt = $this->conn->prepare($ucheck);
-            $ustmt->bindParam(':user_id', $user_id);
-            $ustmt->bindParam(':next_id', $next_id);
-            $ustmt->execute();
-            $nextStatus = $ustmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$nextStatus || $nextStatus['status'] === 'locked') {
-                $unlock = "INSERT INTO user_progress (user_id, case_id, status) VALUES (:user_id, :next_id, 'unlocked')
-                           ON DUPLICATE KEY UPDATE status = 'unlocked'";
-                $ustmt = $this->conn->prepare($unlock);
-                $ustmt->bindParam(':user_id', $user_id);
-                $ustmt->bindParam(':next_id', $next_id);
-                $ustmt->execute();
-            }
+        if ($stmt->rowCount() == 0) {
+            // New completion
+            $insert = "INSERT INTO user_progress (user_id, case_id, completed, best_time, completed_at) VALUES (?, ?, 1, ?, NOW())";
+            $istmt = $this->conn->prepare($insert);
+            $istmt->bindParam(1, $user_id);
+            $istmt->bindParam(2, $case_id);
+            $istmt->bindParam(3, $time_taken);
+            $istmt->execute();
+            return true; // First time complete
         }
-
-        return $rowsAffected > 0;
+        else {
+            // Already completed, maybe update time?
+            return false; // Not first time
+        }
     }
 
     public function updateUserXp($user_id, $xp_gain)
