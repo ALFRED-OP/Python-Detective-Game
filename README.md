@@ -191,3 +191,5 @@ For issues or questions, please open an issue on the GitHub repository.
 -   Built with Python 3.x
 
 ---
+
+**Happy Sleuthing! 🕵️‍♂️**
