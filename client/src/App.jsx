@@ -29,8 +29,13 @@ const Layout = ({ children }) => {
 }
 
 function App() {
+  // Determine the base URL for React Router
+  // In dev (npm run dev), it's '/'
+  // In XAMPP (npm run build), it's '/Python-Detective-Game/client/dist'
+  const basename = import.meta.env.PROD ? '/Python-Detective-Game/client/dist' : '/';
+
   return (
-    <Router>
+    <Router basename={basename}>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<Login />} />

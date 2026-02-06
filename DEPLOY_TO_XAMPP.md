@@ -18,9 +18,10 @@ C:\xampp\htdocs\Python-Detective-Game\
 
 ## 2. Build the Frontend
 Since React needs to be compiled, run the build command:
-1.  Open terminal in `C:\xampp\htdocs\Python-Detective-Game\client`.
-2.  Run:
+1.  Open your terminal in `C:\xampp\htdocs\Python-Detective-Game`.
+2.  Run these commands:
     ```powershell
+    cd client
     npm run build
     ```
     This creates a `dist` folder inside `client`.
