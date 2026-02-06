@@ -19,7 +19,23 @@ const Register = () => {
             await register(username, password);
             navigate('/login');
         } catch (err) {
-            setError(err.error || 'Registration failed');
+            console.error("Registration Error:", err);
+            // If the error is a string (e.g. 500 HTML or raw DB error), show it
+            if (typeof err === 'string') {
+                setError(err);
+            }
+            // If it's an object with an 'error' property
+            else if (err.error) {
+                setError(err.error);
+            }
+            // If it's an object with a 'message' property
+            else if (err.message) {
+                setError(err.message);
+            }
+            // Fallback
+            else {
+                setError('Registration failed. Check console/backend.');
+            }
         }
     };
 
