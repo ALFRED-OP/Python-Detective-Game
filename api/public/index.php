@@ -43,6 +43,14 @@ function sendJson($data, $code = 200)
 $db = new Database();
 $conn = $db->getConnection();
 
+if ($conn === null) {
+    sendJson([
+        'error' => 'Database connection failed',
+        'message' => $db->last_error,
+        'hint' => 'Please ensure your MySQL server is running and the "python_detective" database is created.'
+    ], 500);
+}
+
 // --- ROUTING ---
 
 // Auth Routes
