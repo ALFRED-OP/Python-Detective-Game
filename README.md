@@ -73,7 +73,8 @@ Python-Detective-Game/
 2. Configure `config/db.php` with your MySQL credentials.
 3. Start the PHP server:
    ```bash
-   php -S localhost:8000 -t public
+   cd api
+   php -S localhost:8000 -t public public/index.php
    ```
 
 ### 3. Frontend Setup
