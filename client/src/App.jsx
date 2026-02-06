@@ -7,7 +7,9 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import CaseView from './pages/CaseView';
 import Leaderboard from './pages/Leaderboard';
-import Navbar from './components/Navbar';
+
+// Components
+import Layout from './components/common/Layout';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -15,18 +17,6 @@ const ProtectedRoute = ({ children }) => {
   if (!user) return <Navigate to="/login" replace />;
   return children;
 };
-
-// Layout Wrapper
-const Layout = ({ children }) => {
-  return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
-      <main className="flex-1 p-4 md:p-8 container mx-auto">
-        {children}
-      </main>
-    </div>
-  )
-}
 
 function App() {
   // Determine the base URL for React Router

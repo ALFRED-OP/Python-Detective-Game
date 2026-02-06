@@ -4,9 +4,11 @@ import api from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import CodeEditor from '../components/CodeEditor';
 import EvidenceBoard from '../components/EvidenceBoard';
-import { Play, AlertOctagon, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
-import clsx from 'clsx';
+import TerminalOutput from '../components/case/TerminalOutput';
+import CyberButton from '../components/common/CyberButton';
+import { Play, ArrowLeft, Loader2, Save } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { motion } from 'framer-motion';
 
 const CaseView = () => {
     const { id } = useParams();
@@ -17,7 +19,6 @@ const CaseView = () => {
     const [code, setCode] = useState('');
     const [output, setOutput] = useState('');
     const [status, setStatus] = useState('idle'); // idle, running, passed, failed, error
-    const [resultData, setResultData] = useState(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -25,7 +26,7 @@ const CaseView = () => {
             try {
                 const res = await api.get(`/cases/${id}`);
                 setCaseData(res.data);
-                setCode(res.data.starting_code.replace(/\\n/g, '\n')); // Handle potentially escaped newlines from DB
+                setCode(res.data.starting_code.replace(/\\n/g, '\n'));
             } catch (err) {
                 console.error(err);
                 setOutput("Error loading case file. Connection terminated.");
@@ -39,7 +40,6 @@ const CaseView = () => {
     const handleSubmit = async () => {
         setStatus('running');
         setOutput('Initializing sandbox environment...\nExecuting trace...\n');
-        setResultData(null);
 
         try {
             const res = await api.post('/submit', {
@@ -49,7 +49,6 @@ const CaseView = () => {
             });
 
             const data = res.data;
-            setResultData(data);
 
             if (data.status === 'Passed') {
                 setStatus('passed');
@@ -65,7 +64,6 @@ const CaseView = () => {
                 }
             } else {
                 setStatus(data.status === 'Error' ? 'error' : 'failed');
-                // Format output to show user output vs expected if failed
                 let out = "";
                 if (data.stderr) {
                     out += `STDERR:\n${data.stderr}\n\n`;
@@ -84,69 +82,95 @@ const CaseView = () => {
         }
     };
 
-    if (loading) return <div className="h-[calc(100vh-64px)] flex items-center justify-center text-neon-green font-mono">Loading Case #{id}...</div>;
+    if (loading) return (
+        <div className="h-[calc(100vh-100px)] flex flex-col items-center justify-center text-neon-cyan/80">
+            <Loader2 size={40} className="animate-spin mb-4" />
+            <span className="font-mono text-sm tracking-widest animate-pulse">DECRYPTING CASE FILE #{id}...</span>
+        </div>
+    );
 
-    if (!caseData) return <div className="p-8 text-center text-red-500">Case file corrupted or missing.</div>;
+    if (!caseData) return <div className="p-8 text-center text-red-500 font-mono">CASE FILE CORRUPTED OR MISSING.</div>;
 
     return (
-        <div className="h-[calc(100vh-80px)] flex flex-col md:flex-row gap-4">
-            {/* LEFT PANEL: Evidence & Story */}
-            <div className="md:w-1/3 flex flex-col rounded-lg overflow-hidden border border-noir-600 shadow-2xl">
-                <EvidenceBoard caseData={caseData} />
+        <div className="h-[calc(100vh-100px)] flex flex-col space-y-4">
+            {/* Header / Nav */}
+            <div className="flex items-center justify-between shrink-0">
+                <button
+                    onClick={() => navigate('/')}
+                    className="flex items-center text-gray-400 hover:text-white transition-colors group text-sm font-mono"
+                >
+                    <ArrowLeft size={16} className="mr-2 group-hover:-translate-x-1 transition-transform" />
+                    RETURN TO DASHBOARD
+                </button>
+                <div className="text-xs text-gray-500 font-mono">
+                    CASE ID: <span className="text-white">#{id}</span> // STATUS: <span className="text-neon-cyan">ACTIVE</span>
+                </div>
             </div>
 
-            {/* RIGHT PANEL: Workspace */}
-            <div className="md:w-2/3 flex flex-col gap-4">
-                {/* Editor Area */}
-                <div className="flex-1 flex flex-col">
-                    <div className="flex justify-between items-center bg-noir-800 p-2 rounded-t-lg border border-noir-600 border-b-0">
-                        <div className="flex items-center space-x-2 px-2">
-                            <span className="w-3 h-3 rounded-full bg-red-500"></span>
-                            <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                            <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                            <span className="text-sm font-mono text-gray-400 ml-2">main.py</span>
+            <div className="flex-1 flex flex-col md:flex-row gap-4 min-h-0">
+                {/* LEFT PANEL: Evidence & Story */}
+                <motion.div
+                    initial={{ x: -20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    className="md:w-1/3 flex flex-col min-h-0"
+                >
+                    <EvidenceBoard caseData={caseData} />
+                </motion.div>
+
+                {/* RIGHT PANEL: Workspace */}
+                <motion.div
+                    initial={{ x: 20, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    transition={{ delay: 0.1 }}
+                    className="md:w-2/3 flex flex-col gap-4 min-h-0"
+                >
+                    {/* Editor Area */}
+                    <div className="flex-1 flex flex-col min-h-0">
+                        {/* Toolbar */}
+                        <div className="flex justify-between items-center bg-noir-900 border border-noir-600 border-b-0 rounded-t-lg p-2">
+                            <div className="flex items-center space-x-2 px-3">
+                                <div className="flex space-x-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-red-500/80"></span>
+                                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-500/80"></span>
+                                    <span className="w-2.5 h-2.5 rounded-full bg-green-500/80"></span>
+                                </div>
+                                <span className="text-xs font-mono text-gray-400 ml-3">solution.py</span>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                                <CyberButton
+                                    variant="ghost"
+                                    size="sm"
+                                    icon={Save}
+                                    onClick={() => { }}
+                                    className="!py-1 !px-2 text-xs"
+                                >
+                                    SAVE
+                                </CyberButton>
+                                <CyberButton
+                                    variant="success"
+                                    size="sm"
+                                    icon={Play}
+                                    onClick={handleSubmit}
+                                    isLoading={status === 'running'}
+                                    disabled={status === 'running'}
+                                    className="!py-1"
+                                >
+                                    EXECUTE
+                                </CyberButton>
+                            </div>
                         </div>
-                        <button
-                            onClick={handleSubmit}
-                            disabled={status === 'running'}
-                            className={clsx(
-                                "flex items-center px-4 py-1 rounded text-sm font-bold transition-all",
-                                status === 'running' ? "bg-gray-600 cursor-not-allowed" : "bg-neon-green hover:bg-green-500 text-noir-900 shadow-lg hover:shadow-neon-green/50"
-                            )}
-                        >
-                            {status === 'running' ? 'EXECUTING...' : <><Play size={16} className="mr-2" /> RUN CODE</>}
-                        </button>
-                    </div>
-                    <div className="flex-1">
-                        <CodeEditor code={code} onChange={setCode} />
-                    </div>
-                </div>
 
-                {/* Console / Output Area */}
-                <div className="h-48 bg-noir-900 rounded-lg border border-noir-600 flex flex-col overflow-hidden shadow-inner font-mono text-sm relative">
-                    <div className="bg-noir-800 px-4 py-2 text-xs font-bold text-gray-500 border-b border-noir-700 flex justify-between">
-                        <span>TERMINAL OUTPUT</span>
-                        {status === 'passed' && <span className="text-neon-green flex items-center"><CheckCircle size={12} className="mr-1" /> CASE SOLVED</span>}
-                        {status === 'failed' && <span className="text-red-500 flex items-center"><XCircle size={12} className="mr-1" /> INCORRECT</span>}
-                        {status === 'error' && <span className="text-yellow-500 flex items-center"><AlertOctagon size={12} className="mr-1" /> RUNTIME ERROR</span>}
-                    </div>
-
-                    <pre className="p-4 flex-1 overflow-auto text-gray-300 font-mono whitespace-pre-wrap leading-relaxed">
-                        {output || <span className="text-gray-600 italic">// Output will appear here...</span>}
-                    </pre>
-
-                    {/* Success Overlay Actions */}
-                    {status === 'passed' && (
-                        <div className="absolute top-1 right-2 animate-in fade-in slide-in-from-right duration-500">
-                            <button
-                                onClick={() => navigate('/')}
-                                className="bg-noir-800 text-neon-purple border border-neon-purple/50 px-3 py-1 rounded text-xs font-bold hover:bg-neon-purple hover:text-white transition-colors flex items-center"
-                            >
-                                RETURN TO HQ <ArrowRight size={12} className="ml-2" />
-                            </button>
+                        {/* Editor Component */}
+                        <div className="flex-1 min-h-0">
+                            <CodeEditor code={code} onChange={setCode} />
                         </div>
-                    )}
-                </div>
+                    </div>
+
+                    {/* Console / Output Area */}
+                    <div className="h-1/3 min-h-[150px] shrink-0">
+                        <TerminalOutput output={output} status={status} />
+                    </div>
+                </motion.div>
             </div>
         </div>
     );

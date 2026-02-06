@@ -1,36 +1,18 @@
 import { useState, useEffect } from 'react';
 import api from '../lib/api';
-import { Link } from 'react-router-dom';
-import { Lock, Unlock, CheckCircle, Clock } from 'lucide-react';
-import clsx from 'clsx';
-import { useAuth } from '../context/AuthContext';
+import { motion } from 'framer-motion';
+import CaseCard from '../components/dashboard/CaseCard';
+import DashboardScene from '../components/dashboard/DashboardScene';
+import { Loader2 } from 'lucide-react';
 
 const Dashboard = () => {
     const [cases, setCases] = useState([]);
     const [loading, setLoading] = useState(true);
-    const { user } = useAuth();
 
-    // Fetch cases and user progress
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const res = await api.get('/cases');
-                // Assuming response is an array of cases
-                // We also need user progress (frontend can infer from API if API returned it, 
-                // but our /cases endpoint just returns cases. 
-                // Ideally /cases should include "completed: boolean" if user is logged in, OR we fetch progress separately.
-                // For now, let's fetch progress or update backend. 
-                // Update: Backtrack. Let's make /cases return completed status?
-                // Or simpler: /cases works. We map locally if we had progress endpoint.
-                // Let's implement a quick progress check on backend? 
-                // Actually, backend /cases endpoint logic was: "getAllCases".
-                // Let's stick to simple dashboard for now. We won't show "Completed" tick unless we have the data.
-                // Wait, SubmissionModel has getUserProgress.
-                // I should have exposed an endpoint for it.
-                // I can add it to `index.php`?
-                // Or just assume local user state has it?
-                // User state in context has `xp`.
-                // Let's just list cases for now.
                 setCases(res.data);
             } catch (err) {
                 console.error(err);
@@ -41,61 +23,68 @@ const Dashboard = () => {
         fetchData();
     }, []);
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
     return (
-        <div className="space-y-8">
-            <div className="flex justify-between items-end border-b border-noir-600 pb-4">
-                <div>
-                    <h1 className="text-4xl font-mono font-bold text-gray-100">CASE FILES</h1>
-                    <p className="text-gray-400 mt-2">Select a file to begin investigation.</p>
+        <div className="relative min-h-[calc(100vh-100px)]">
+            {/* 3D Background */}
+            <DashboardScene />
+
+            <div className="relative z-10 flex flex-col space-y-8">
+                <div className="flex flex-col md:flex-row justify-between items-end border-b border-white/10 pb-6 backdrop-blur-sm bg-noir-900/30 p-4 rounded-xl">
+                    <motion.div
+                        initial={{ x: -20, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ duration: 0.5 }}
+                    >
+                        <h1 className="text-4xl md:text-5xl font-display font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
+                            CASE FILES
+                        </h1>
+                        <p className="text-neon-cyan/80 mt-2 font-mono text-sm tracking-wide">
+                             // SELECT CASE FILE TO BEGIN INVESTIGATION
+                        </p>
+                    </motion.div>
+
+                    <motion.div
+                        initial={{ x: 20, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ duration: 0.5, delay: 0.2 }}
+                        className="text-right hidden md:block"
+                    >
+                        <div className="text-xs text-gray-500 font-mono tracking-widest mb-1">SYSTEM STATUS</div>
+                        <div className="text-neon-green font-bold flex items-center justify-end gap-2 bg-neon-green/10 px-3 py-1 rounded-full border border-neon-green/20">
+                            <span className="w-2 h-2 bg-neon-green rounded-full animate-pulse" />
+                            ACTIVE AGENT
+                        </div>
+                    </motion.div>
                 </div>
-                <div className="text-right hidden md:block">
-                    <div className="text-sm text-gray-500">CURRENT STATUS</div>
-                    <div className="text-neon-green font-bold">ACTIVE AGENT</div>
-                </div>
+
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-40 text-neon-purple">
+                        <Loader2 size={40} className="animate-spin mb-4" />
+                        <span className="font-mono text-sm animate-pulse">DECRYPTING ARCHIVES...</span>
+                    </div>
+                ) : (
+                    <motion.div
+                        variants={containerVariants}
+                        initial="hidden"
+                        animate="visible"
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20"
+                    >
+                        {cases.map((c, index) => (
+                            <CaseCard key={c.id} caseData={c} index={index} />
+                        ))}
+                    </motion.div>
+                )}
             </div>
-
-            {loading ? (
-                <div className="text-center py-20 text-gray-500 animate-pulse">Accessing Archives...</div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {cases.map((c) => (
-                        <Link
-                            to={`/case/${c.id}`}
-                            key={c.id}
-                            className={clsx(
-                                "group relative p-6 bg-noir-800 border border-noir-600 rounded-lg hover:border-neon-purple transition-all hover:shadow-[0_0_20px_rgba(176,38,255,0.2)] overflow-hidden",
-                            )}
-                        >
-                            <div className="absolute top-0 right-0 p-2 opacity-50">
-                                <div className="text-4xl font-bold text-noir-700 font-mono">#{String(c.id).padStart(3, '0')}</div>
-                            </div>
-
-                            <div className="relative z-10">
-                                <div className={clsx(
-                                    "inline-flex items-center px-2 py-1 rounded text-xs font-bold mb-3",
-                                    c.difficulty === 'Easy' ? "bg-green-900/30 text-green-400" :
-                                        c.difficulty === 'Medium' ? "bg-yellow-900/30 text-yellow-400" :
-                                            "bg-red-900/30 text-red-500"
-                                )}>
-                                    {c.difficulty.toUpperCase()}
-                                </div>
-
-                                <h3 className="text-xl font-bold mb-1 text-gray-100 group-hover:text-neon-purple transition-colors">{c.title}</h3>
-                                <div className="text-sm text-gray-400 mb-4 font-mono">{c.category}</div>
-
-                                <div className="flex items-center justify-between mt-6 text-sm">
-                                    <span className="text-gray-500 flex items-center">
-                                        <Clock size={14} className="mr-1" /> XP REWARD: {c.xp_reward}
-                                    </span>
-                                    <span className="text-neon-blue flex items-center group-hover:translate-x-1 transition-transform">
-                                        OPEN FILE &rarr;
-                                    </span>
-                                </div>
-                            </div>
-                        </Link>
-                    ))}
-                </div>
-            )}
         </div>
     );
 };
