@@ -14,20 +14,20 @@ The Python Detective Game is a multi-tier web application designed to teach Pyth
 Describes the functional requirements from the perspective of the Investigator (User).
 
 ```mermaid
-useCaseDiagram
-    actor Investigator as "Investigator (Player)"
-    actor Admin as "Database Admin"
+graph TD
+    Investigator((Investigator))
+    Admin((Database Admin))
 
-    package "Python Detective System" {
-        usecase UC1 as "Register / Create Profile"
-        usecase UC2 as "Login / Authenticate"
-        usecase UC3 as "Browse Case Files"
-        usecase UC4 as "Investigate Evidence (Briefing/Hints)"
-        usecase UC5 as "Write & Execute Python Code"
-        usecase UC6 as "Submit Verdict (Comparison)"
-        usecase UC7 as "View Global Leaderboard"
-        usecase UC8 as "Manage Cases (SQL Seed)"
-    }
+    subgraph "Python Detective System"
+        UC1[Register / Create Profile]
+        UC2[Login / Authenticate]
+        UC3[Browse Case Files]
+        UC4[Investigate Evidence]
+        UC5[Write & Execute Python Code]
+        UC6[Submit Verdict]
+        UC7[View Global Leaderboard]
+        UC8[Manage Cases]
+    end
 
     Investigator --> UC1
     Investigator --> UC2
@@ -46,32 +46,32 @@ useCaseDiagram
 The system follows a decoupled Client-Server architecture.
 
 ```mermaid
-componentDiagram
-    package "Client Tier (Frontend)" {
-        [React Application] <<UI>>
-        [Auth Context] <<State Manager>>
-        [Axios Client] <<Service>>
-    }
+graph TD
+    subgraph "Client Tier (Frontend)"
+        RA[React Application]
+        AC[Auth Context]
+        AX[Axios Client]
+    end
 
-    package "Logic Tier (Backend API)" {
-        [PHP Controller] <<Logic>>
-        [PHP Model] <<Data Access>>
-        [CORS/Utility] <<Helper>>
-    }
+    subgraph "Logic Tier (Backend API)"
+        PC[PHP Controller]
+        PM[PHP Model]
+        CU[CORS/Utility]
+    end
 
-    package "Execution Tier (Engine)" {
-        [Python Runner] <<Sandbox>>
-    }
+    subgraph "Execution Tier (Engine)"
+        PR[Python Runner]
+    end
 
-    database "Data Tier" {
-        [MySQL Database] <<Storage>>
-    }
+    subgraph "Data Tier"
+        MD[(MySQL Database)]
+    end
 
-    [React Application] --> [Axios Client]
-    [Axios Client] -- REST/JSON --> [PHP Controller]
-    [PHP Controller] --> [PHP Model]
-    [PHP Model] --> [MySQL Database]
-    [PHP Controller] -- proc_open --> [Python Runner]
+    RA --> AX
+    AX -- REST/JSON --> PC
+    PC --> PM
+    PM --> MD
+    PC -- proc_open --> PR
 ```
 
 ---
@@ -179,28 +179,28 @@ stateDiagram-v2
 Hardware and software mapping for the production/development environment.
 
 ```mermaid
-deploymentDiagram
-    node "User Device" {
-        [Web Browser] <<Client Runtime>>
-    }
+graph TD
+    subgraph "User Device"
+        WB[Web Browser]
+    end
 
-    node "Web Server (XAMPP/NGINX)" {
-        [PHP 8.0 Interpreter]
-        [Vite Dev Server (Node.js)]
-    }
+    subgraph "Web Server (XAMPP/NGINX)"
+        PHP[PHP 8.0 Interpreter]
+        Vite[Vite Dev Server Node.js]
+    end
 
-    node "Storage Server" {
-        database "MySQL Instance"
-    }
+    subgraph "Storage Server"
+        DB[(MySQL Instance)]
+    end
 
-    node "Sandbox Node" {
-        [Python 3.13 Runtime]
-    }
+    subgraph "Sandbox Node"
+        Py[Python 3.13 Runtime]
+    end
 
-    [Web Browser] -- HTTP/HTTPS --> [Vite Dev Server (Node.js)]
-    [Vite Dev Server (Node.js)] -- FastCGI --> [PHP 8.0 Interpreter]
-    [PHP 8.0 Interpreter] -- TCP/IP (3306) --> [MySQL Instance]
-    [PHP 8.0 Interpreter] -- Shell Execution --> [Python 3.13 Runtime]
+    WB -- HTTP/HTTPS --> Vite
+    Vite -- FastCGI --> PHP
+    PHP -- TCP/IP 3306 --> DB
+    PHP -- Shell Execution --> Py
 ```
 
 ---
