@@ -4,6 +4,7 @@
 [![Status](https://img.shields.io/badge/Status-Active_Investigation-00ff41)](https://github.com/ALFRED-OP/Python-Detective-Game)
 [![Tech](https://img.shields.io/badge/Stack-React_|_PHP_|_MySQL-b026ff)](https://github.com/ALFRED-OP/Python-Detective-Game)
 [![Security](https://img.shields.io/badge/Sandbox-Python_3.13.7-00f3ff)](https://github.com/ALFRED-OP/Python-Detective-Game)
+[![Docs](https://img.shields.io/badge/Documentation-Architecture_&_Design-important)](docs/architecture_and_design.md)
 
 Welcome to the **Python Detective Game**, an immersive investigation experience where code analysis is your primary weapon. Step into the shoes of a cyber-noir detective, analyze corrupted scripts found at crime scenes, and fix logic gaps to catch killers.
 
