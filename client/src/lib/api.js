@@ -5,8 +5,10 @@ import axios from 'axios';
 // Assuming directory structure: /root/client_build/index.html and /root/api/public/index.php
 // The API is at ../../api/public from the client URL perspective? 
 // No, if user accesses localhost/Project/client/dist/, API is localhost/Project/api/public/
+// If in production, dynamically find the API based on current location
+// Logic: Application is in .../client/dist, API is in .../api/public
 const API_URL = import.meta.env.PROD
-    ? '../../api/public'
+    ? window.location.href.split('/client/dist')[0] + '/api/public'
     : 'http://localhost:8000'; // Dev mode uses standalone PHP server
 
 const api = axios.create({
