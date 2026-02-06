@@ -6,24 +6,28 @@ import { ReactLenis } from 'lenis/react';
 
 const Typewriter = ({ text, delay = 10, onComplete }) => {
     const [displayedText, setDisplayedText] = useState('');
-    const index = useRef(0);
 
     useEffect(() => {
-        setDisplayedText('');
-        index.current = 0;
+        let isCancelled = false;
+        let currentText = '';
 
         const interval = setInterval(() => {
-            if (index.current < text.length) {
-                setDisplayedText((prev) => prev + text.charAt(index.current));
-                index.current++;
+            if (isCancelled) return;
+
+            if (currentText.length < text.length) {
+                currentText += text.charAt(currentText.length);
+                setDisplayedText(currentText);
             } else {
                 clearInterval(interval);
                 if (onComplete) onComplete();
             }
         }, delay);
 
-        return () => clearInterval(interval);
-    }, [text]);
+        return () => {
+            isCancelled = true;
+            clearInterval(interval);
+        };
+    }, [text, delay, onComplete]);
 
     return <span>{displayedText}</span>;
 }
@@ -70,7 +74,7 @@ const TerminalOutput = ({ output, status }) => {
 
                 <div className="relative z-10 text-gray-300 whitespace-pre-wrap">
                     {output ? (
-                        <Typewriter text={output} delay={5} />
+                        <Typewriter key={output} text={output} delay={5} />
                     ) : (
                         <span className="text-gray-600 italic opacity-50">// Waiting for input...</span>
                     )}
