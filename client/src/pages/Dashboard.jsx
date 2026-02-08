@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { motion } from 'framer-motion';
 import CaseCard from '../components/dashboard/CaseCard';
 import DashboardScene from '../components/dashboard/DashboardScene';
@@ -8,11 +9,12 @@ import { Loader2 } from 'lucide-react';
 const Dashboard = () => {
     const [cases, setCases] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { user } = useAuth();
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const res = await api.get('/cases');
+                const res = await api.get(`/cases?user_id=${user?.id}`);
                 setCases(res.data);
             } catch (err) {
                 console.error(err);
@@ -20,8 +22,8 @@ const Dashboard = () => {
                 setLoading(false);
             }
         };
-        fetchData();
-    }, []);
+        if (user?.id) fetchData();
+    }, [user?.id]);
 
     const containerVariants = {
         hidden: { opacity: 0 },

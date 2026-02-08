@@ -12,9 +12,27 @@ class CaseController
 
     public function getAllCases()
     {
-        $case = new CaseModel($this->conn);
-        $result = $case->getAll();
-        sendJson($result);
+        $caseModel = new CaseModel($this->conn);
+        $cases = $caseModel->getAll();
+
+        // If user_id is provided, mark which cases are completed
+        $userId = isset($_GET['user_id']) ? $_GET['user_id'] : null;
+        if ($userId) {
+            require_once '../models/SubmissionModel.php';
+            $submissionModel = new SubmissionModel($this->conn);
+            $completedCaseIds = $submissionModel->getUserProgress($userId);
+
+            foreach ($cases as &$c) {
+                $c['completed'] = in_array($c['id'], $completedCaseIds);
+            }
+        }
+        else {
+            foreach ($cases as &$c) {
+                $c['completed'] = false;
+            }
+        }
+
+        sendJson($cases);
     }
 
     public function getCase($id)

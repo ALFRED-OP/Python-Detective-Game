@@ -1,10 +1,11 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Clock, ChevronRight, Lock, Unlock } from 'lucide-react';
+import { Clock, ChevronRight, Lock, CheckCircle } from 'lucide-react';
 import { clsx } from 'clsx';
 
 const CaseCard = ({ caseData, index }) => {
-    const isLocked = false; // Logic for locking can be added later
+    const isLocked = false;
+    const isCompleted = caseData.completed;
 
     const variants = {
         hidden: { opacity: 0, y: 20 },
@@ -52,8 +53,11 @@ const CaseCard = ({ caseData, index }) => {
                             </span>
                         </div>
 
-                        <h3 className="text-xl font-bold text-gray-100 mb-2 group-hover:text-neon-purple transition-colors font-display tracking-tight">
+                        <h3 className="text-xl font-bold text-gray-100 mb-2 group-hover:text-neon-purple transition-colors font-display tracking-tight flex items-center gap-2">
                             {caseData.title}
+                            {isCompleted && (
+                                <CheckCircle size={18} className="text-neon-green fill-neon-green/10" />
+                            )}
                         </h3>
 
                         <p className="text-gray-400 text-sm font-mono mb-6 line-clamp-2">
