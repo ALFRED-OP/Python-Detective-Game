@@ -6,6 +6,10 @@ This deployment architecture implements a three-tier web application with CDN pr
 
 User -> Cloudflare (CDN/Proxy/SSL) -> CloudPanel (Nginx/PHP-FPM) -> Application (React SPA + PHP REST API + Python Sandbox) -> MySQL Database
 
+**Domain Structure:**
+- **CloudPanel Admin:** cp.dipteshdey.in (access server management)
+- **Application:** pydetective.dipteshdey.in (main website)
+
 **Data Flow:**
 - Cloudflare handles DDoS protection, SSL termination, caching, and hides real server IP
 - CloudPanel manages Nginx vhosts, PHP-FPM processes, and basic server operations
@@ -138,7 +142,6 @@ sudo systemctl disable cups
 sudo systemctl disable avahi-daemon
 sudo systemctl disable snapd
 sudo systemctl disable rsyslog
-sudo systemctl install rsyslog-core
 
 # Configure system logs to reduce memory usage
 sudo nano /etc/rsyslog.conf
@@ -191,7 +194,7 @@ sudo systemctl status php8.1-fpm
 ```
 
 **First-login checklist:**
-1. Access CloudPanel at https://YOUR_SERVER_IP:8443
+1. Access CloudPanel at https://cp.dipteshdey.in (after DNS setup)
 2. Create admin user with strong password (min 12 chars)
 3. Configure correct timezone
 4. Enable automatic backups to /home/cloudpanel/backups
@@ -202,64 +205,47 @@ sudo systemctl status php8.1-fpm
 9. Review and customize default Nginx templates
 10. Test SSL certificate generation for test domain
 
+**Important:** Before accessing CloudPanel, ensure DNS for cp.dipteshdey.in is configured in Cloudflare (see next section).
+
 ## Cloudflare DNS Configuration
 
-In Cloudflare dashboard for pydetective.dipteshdey.in:
+In Cloudflare dashboard for dipteshdey.in:
 
-**A Records:**
+**CloudPanel DNS Records (cp.dipteshdey.in):**
 ```
-Type: A
-Name: @ (root domain)
-IPv4 address: YOUR_VPS_IP_ADDRESS
-Proxy status: DNS Only (grey cloud)
-TTL: Auto
-Comment: Direct access for admin panel
-
-Type: A  
-Name: pydetective
-IPv4 address: YOUR_VPS_IP_ADDRESS
-Proxy status: Proxied (orange cloud)
-TTL: Auto
-Comment: Main application domain
-
-Type: A
-Name: www
-IPv4 address: YOUR_VPS_IP_ADDRESS
-Proxy status: Proxied (orange cloud)
-TTL: Auto
-Comment: WWW redirect to main domain
-
 Type: A
 Name: cp
 IPv4 address: YOUR_VPS_IP_ADDRESS
 Proxy status: DNS Only (grey cloud)
 TTL: Auto
-Comment: CloudPanel admin access
+Comment: CloudPanel admin access - MUST be DNS Only
 ```
 
-**AAAA Records (IPv6 - disable if not using IPv6):**
+**Application DNS Records (pydetective.dipteshdey.in):**
 ```
-Type: AAAA
-Name: @
-IPv6 address: :: (leave blank)
-Proxy status: DNS Only (grey cloud)
-TTL: Auto
-
-Type: AAAA
+Type: A
 Name: pydetective
-IPv6 address: :: (leave blank)
-Proxy status: DNS Only (grey cloud)
+IPv4 address: YOUR_VPS_IP_ADDRESS
+Proxy status: Proxied (orange cloud)
 TTL: Auto
+Comment: Main application domain - proxied for CDN protection
+
+Type: A
+Name: www.pydetective
+IPv4 address: YOUR_VPS_IP_ADDRESS
+Proxy status: Proxied (orange cloud)
+TTL: Auto
+Comment: WWW subdomain redirect
 ```
 
-**Additional Records:**
+**Optional Additional Records:**
 ```
 Type: CNAME
-Name: admin
-Target: cp.pydetective.dipteshdey.in
-Proxy status: DNS Only (grey cloud)
+Name: pydetective
+Target: pydetective.dipteshdey.in
+Proxy status: Proxied (orange cloud)
 TTL: Auto
-Comment: Admin panel alternative access
+Comment: Alternative access method
 
 Type: TXT
 Name: @
@@ -273,16 +259,21 @@ Comment: SPF record for email (if using)
 - TXT records: 3600 seconds
 - CNAME records: Auto
 
+**Critical Notes:**
+1. **cp.dipteshdey.in MUST be DNS Only (grey cloud)** - CloudPanel needs direct IP access
+2. **pydetective.dipteshdey.in SHOULD be Proxied (orange cloud)** - For CDN and DDoS protection
+3. Wait 5-10 minutes for DNS propagation before accessing cp.dipteshdey.in
+
 ## Cloudflare SSL/TLS Configuration
 
-**Step 1: Configure SSL Mode**
+**Step 1: Configure SSL Mode for Both Domains**
 1. In Cloudflare dashboard -> SSL/TLS -> Overview
 2. Select "Full (Strict)" mode
 3. Ensure "Automatic HTTPS Rewrites" is enabled
 4. Enable "Always Use HTTPS"
 5. Enable "HSTS" (if you're sure about HTTPS-only)
 
-**Step 2: Generate Origin Certificate**
+**Step 2: Generate Origin Certificate for Application**
 1. Go to SSL/TLS -> Origin Server -> Create Certificate
 2. Configure:
    - Hostnames: *.pydetective.dipteshdey.in, pydetective.dipteshdey.in
@@ -291,15 +282,22 @@ Comment: SPF record for email (if using)
 3. Download: certificate.pem and private_key.pem
 4. Store securely offline as backup
 
-**Step 3: Install Certificate on Server**
+**Step 3: Generate Origin Certificate for CloudPanel (Optional)**
+1. Go to SSL/TLS -> Origin Server -> Create Certificate
+2. Configure:
+   - Hostnames: *.cp.dipteshdey.in, cp.dipteshdey.in
+   - Certificate Type: RSA (2048)
+   - Validity: 15 years (maximum)
+3. Download: certificate.pem and private_key.pem
+
+**Step 4: Install Certificate on Server for Application**
 ```bash
 # Create SSL directory structure
 sudo mkdir -p /etc/cloudpanel/ssl/pydetective.dipteshdey.in
 sudo chown root:root /etc/cloudpanel/ssl/pydetective.dipteshdey.in
 sudo chmod 755 /etc/cloudpanel/ssl/pydetective.dipteshdey.in
 
-# Upload certificate files (secure method)
-# Using nano to paste content directly
+# Upload certificate files (using nano to paste content directly)
 sudo nano /etc/cloudpanel/ssl/pydetective.dipteshdey.in/certificate.pem
 # Paste entire certificate content from Cloudflare
 
@@ -316,7 +314,26 @@ sudo openssl x509 -in /etc/cloudpanel/ssl/pydetective.dipteshdey.in/certificate.
 sudo openssl rsa -in /etc/cloudpanel/ssl/pydetective.dipteshdey.in/private_key.pem -check
 ```
 
-**Step 4: Configure CloudPanel SSL**
+**Step 5: Install Certificate on Server for CloudPanel**
+```bash
+# Create SSL directory for CloudPanel
+sudo mkdir -p /etc/cloudpanel/ssl/cp.dipteshdey.in
+sudo chown root:root /etc/cloudpanel/ssl/cp.dipteshdey.in
+sudo chmod 755 /etc/cloudpanel/ssl/cp.dipteshdey.in
+
+# Upload CloudPanel certificate files
+sudo nano /etc/cloudpanel/ssl/cp.dipteshdey.in/certificate.pem
+# Paste CloudPanel certificate content
+
+sudo nano /etc/cloudpanel/ssl/cp.dipteshdey.in/private_key.pem
+# Paste CloudPanel private key content
+
+# Set proper permissions
+sudo chmod 644 /etc/cloudpanel/ssl/cp.dipteshdey.in/certificate.pem
+sudo chmod 600 /etc/cloudpanel/ssl/cp.dipteshdey.in/private_key.pem
+```
+
+**Step 6: Configure CloudPanel SSL for Application**
 1. In CloudPanel dashboard -> Sites -> Add Site
 2. Domain: pydetective.dipteshdey.in
 3. PHP Version: 8.1+
@@ -324,23 +341,27 @@ sudo openssl rsa -in /etc/cloudpanel/ssl/pydetective.dipteshdey.in/private_key.p
 5. Certificate: /etc/cloudpanel/ssl/pydetective.dipteshdey.in/certificate.pem
 6. Private Key: /etc/cloudpanel/ssl/pydetective.dipteshdey.in/private_key.pem
 
-**Step 5: Verify SSL Configuration**
+**Step 7: Verify SSL Configuration**
 ```bash
-# Test SSL certificate
+# Test SSL certificate for application
 sudo nginx -t
 sudo systemctl reload nginx
 
-# Check SSL details
+# Check SSL details for application
 openssl s_client -connect pydetective.dipteshdey.in:443 -servername pydetective.dipteshdey.in
+
+# Test SSL for CloudPanel
+openssl s_client -connect cp.dipteshdey.in:443 -servername cp.dipteshdey.in
 
 # Cloudflare diagnostic
 curl -I https://pydetective.dipteshdey.in
+curl -I https://cp.dipteshdey.in
 ```
 
 ## Website Deployment
 
 **Step 1: Create Site in CloudPanel**
-1. Login to CloudPanel at https://YOUR_IP:8443
+1. Login to CloudPanel at https://cp.dipteshdey.in
 2. Navigate to Sites -> Add Site
 3. Select: PHP Site
 4. Domain: pydetective.dipteshdey.in
@@ -728,17 +749,14 @@ limit_req_zone $binary_remote_addr zone=general_requests:10m rate=20r/s;
 # Apply rate limiting to specific endpoints
 location /api/submit {
     limit_req zone=api_submissions burst=10 nodelay;
-    # Pass to PHP API configuration
 }
 
 location /api/auth/login {
     limit_req zone=login_attempts burst=3 nodelay;
-    # Pass to PHP API configuration
 }
 
 location / {
     limit_req zone=general_requests burst=40 nodelay;
-    # Default location configuration
 }
 ```
 
@@ -864,9 +882,8 @@ sudo tail -f /var/log/php8.1-fpm.log
 free -h
 df -h
 
-# Temporarily bypass Cloudflare to test direct connection
-# Set Cloudflare DNS to DNS Only (grey cloud) for testing
-curl -I http://YOUR_IP
+# Test direct connection (bypass Cloudflare)
+curl -I https://pydetective.dipteshdey.in
 ```
 
 **Dark/Blank Screen on Frontend**
@@ -980,6 +997,38 @@ location / {
 }
 ```
 
+**CloudPanel Access Issues (cp.dipteshdey.in)**
+
+Symptoms: Cannot access CloudPanel admin at cp.dipteshdey.in
+Root Causes:
+1. DNS not configured (grey cloud required)
+2. SSL certificate missing for cp.dipteshdey.in
+3. Firewall blocking port 8443
+4. CloudPanel service not running
+
+Solutions:
+```bash
+# Check DNS propagation
+dig cp.dipteshdey.in
+
+# Verify DNS is DNS Only (grey cloud)
+# Check Cloudflare dashboard
+
+# Test direct IP access (temporarily)
+curl -k https://YOUR_SERVER_IP:8443
+
+# Check firewall rules
+sudo ufw status
+
+# Verify CloudPanel service
+sudo systemctl status cloudpanel
+sudo systemctl restart cloudpanel
+
+# Check Nginx for CloudPanel
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
 ## Final Go-Live Checklist
 
 **Security Checklist**
@@ -987,7 +1036,7 @@ location / {
 - [ ] Password authentication disabled, key-based auth enabled
 - [ ] UFW firewall configured and active
 - [ ] Fail2ban installed and monitoring
-- [ ] SSL/TLS certificates properly installed (Full Strict)
+- [ ] SSL/TLS certificates properly installed for both domains (Full Strict)
 - [ ] Security headers implemented (HSTS, CSP, X-Frame-Options)
 - [ ] Rate limiting configured for API endpoints
 - [ ] Real IP headers configured for Cloudflare
@@ -996,6 +1045,7 @@ location / {
 - [ ] Server software versions up to date
 - [ ] Cloudflare WAF rules configured
 - [ ] Two-factor authentication enabled where possible
+- [ ] cp.dipteshdey.in DNS is DNS Only (grey cloud)
 
 **Performance Checklist**
 - [ ] 2GB swap file created and active
@@ -1199,6 +1249,7 @@ echo -e "\n=== Service Status ===" >> $LOG_FILE
 systemctl is-active nginx >> $LOG_FILE
 systemctl is-active php8.1-fpm >> $LOG_FILE
 systemctl is-active mysql >> $LOG_FILE
+systemctl is-active cloudpanel >> $LOG_FILE
 ```
 
 ```bash
@@ -1286,5 +1337,9 @@ tar -czf $BACKUP_DIR/config.tar.gz /etc/nginx /etc/php/8.1 /etc/mysql /etc/cloud
 
 echo "Backup completed: $(date) - $BACKUP_DIR"
 ```
+
+**Domain Management Summary:**
+- **CloudPanel Admin:** https://cp.dipteshdey.in (DNS Only - grey cloud)
+- **Application:** https://pydetective.dipteshdey.in (Proxied - orange cloud)
 
 This comprehensive setup ensures production-ready deployment, security, and maintainability for your Python Detective Game on a resource-constrained VPS.
