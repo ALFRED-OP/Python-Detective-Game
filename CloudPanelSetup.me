@@ -1,0 +1,1290 @@
+# CloudPanelSetup.me
+
+## Overview & Architecture
+
+This deployment architecture implements a three-tier web application with CDN protection:
+
+User -> Cloudflare (CDN/Proxy/SSL) -> CloudPanel (Nginx/PHP-FPM) -> Application (React SPA + PHP REST API + Python Sandbox) -> MySQL Database
+
+**Data Flow:**
+- Cloudflare handles DDoS protection, SSL termination, caching, and hides real server IP
+- CloudPanel manages Nginx vhosts, PHP-FPM processes, and basic server operations
+- React frontend served statically by Nginx
+- PHP REST API processed by PHP-FPM
+- Python code execution sandbox runs in isolated subprocess
+- MySQL database stores user data and case content
+
+**Security Layers:**
+1. Cloudflare WAF and DDoS protection
+2. UFW firewall on server
+3. Nginx reverse proxy with security headers
+4. PHP-FPM process isolation
+5. MySQL user privilege separation
+6. Python sandbox with resource limits
+
+## VPS Initial Preparation
+
+```bash
+# Update system packages
+sudo apt update && sudo apt upgrade -y
+
+# Create non-root sudo user (replace with your username)
+sudo adduser admin
+sudo usermod -aG sudo admin
+su - admin
+
+# SSH Hardening - edit /etc/ssh/sshd_config
+sudo nano /etc/ssh/sshd_config
+```
+
+Configure these settings in sshd_config:
+```
+Port 22
+Protocol 2
+PermitRootLogin no
+PasswordAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile .ssh/authorized_keys
+MaxAuthTries 3
+ClientAliveInterval 300
+ClientAliveCountMax 2
+UsePAM yes
+X11Forwarding no
+PrintMotd no
+PrintLastLog yes
+TCPKeepAlive yes
+UsePrivilegeSeparation sandbox
+```
+
+```bash
+# Restart SSH with new configuration
+sudo systemctl restart ssh
+
+# Configure UFW firewall
+sudo ufw default deny incoming
+sudo ufw default allow outgoing
+sudo ufw allow ssh
+sudo ufw allow 80/tcp
+sudo ufw allow 443/tcp
+sudo ufw allow 8443/tcp  # CloudPanel admin
+sudo ufw enable
+
+# Install and configure fail2ban
+sudo apt install fail2ban -y
+sudo cp /etc/fail2ban/jail.conf /etc/fail2ban/jail.local
+sudo nano /etc/fail2ban/jail.local
+```
+
+Configure fail2ban settings:
+```
+[DEFAULT]
+bantime = 3600
+findtime = 600
+maxretry = 3
+backend = systemd
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+bantime = 3600
+
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+logpath = /var/log/nginx/error.log
+maxretry = 3
+bantime = 3600
+
+[nginx-limit-req]
+enabled = true
+filter = nginx-limit-req
+logpath = /var/log/nginx/error.log
+maxretry = 10
+bantime = 600
+```
+
+```bash
+# Enable and start fail2ban
+sudo systemctl enable fail2ban
+sudo systemctl start fail2ban
+sudo ufw status verbose
+```
+
+## Memory Optimization (CRITICAL)
+
+```bash
+# Create 2GB swap file (essential for 1GB RAM VPS)
+sudo fallocate -l 2G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+
+# Make swap permanent across reboots
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+
+# Optimize memory management
+echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf
+echo 'vm.vfs_cache_pressure=50' | sudo tee -a /etc/sysctl.conf
+echo 'vm.dirty_ratio=15' | sudo tee -a /etc/sysctl.conf
+echo 'vm.dirty_background_ratio=5' | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+
+# Disable memory-intensive services
+sudo systemctl disable bluetooth
+sudo systemctl disable cups
+sudo systemctl disable avahi-daemon
+sudo systemctl disable snapd
+sudo systemctl disable rsyslog
+sudo systemctl install rsyslog-core
+
+# Configure system logs to reduce memory usage
+sudo nano /etc/rsyslog.conf
+```
+
+Edit rsyslog.conf to reduce logging:
+```
+# Remove most logs, keep only critical
+*.*;auth,authpriv.none          -/var/log/syslog
+auth,authpriv.*                 /var/log/auth.log
+kern.*                          -/var/log/kern.log
+*.err                           /var/log/error.log
+```
+
+```bash
+# Clean system
+sudo apt autoremove -y
+sudo apt autoclean
+sudo apt clean
+sudo journalctl --vacuum-time=2d
+
+# Verify memory and swap
+free -h
+```
+
+**Why these optimizations are critical for 1GB RAM:**
+- 2GB swap prevents OOM kills during memory spikes
+- Swappiness=10 favors RAM over swap for performance
+- Disabled services save ~200-300MB RAM
+- Reduced logging prevents disk space exhaustion
+- Dirty page ratios optimize write performance
+
+## CloudPanel Installation
+
+```bash
+# Install CloudPanel (official installation script)
+curl -sS https://installer.cloudpanel.io/ce/v2/install.sh | sudo bash
+
+# Required ports for CloudPanel operation:
+# 80   - HTTP (redirects to HTTPS)
+# 443  - HTTPS
+# 8443 - CloudPanel Admin Interface
+# 21   - FTP (optional, disable if not needed)
+# 22   - SSH (already configured)
+
+# Post-installation verification
+sudo netstat -tlnp | grep -E ':(80|443|8443)'
+sudo systemctl status nginx
+sudo systemctl status php8.1-fpm
+```
+
+**First-login checklist:**
+1. Access CloudPanel at https://YOUR_SERVER_IP:8443
+2. Create admin user with strong password (min 12 chars)
+3. Configure correct timezone
+4. Enable automatic backups to /home/cloudpanel/backups
+5. Update CloudPanel to latest version via admin panel
+6. Create SSH key pair for secure file transfers
+7. Configure backup retention (keep 7-30 days)
+8. Enable two-factor authentication if available
+9. Review and customize default Nginx templates
+10. Test SSL certificate generation for test domain
+
+## Cloudflare DNS Configuration
+
+In Cloudflare dashboard for pydetective.dipteshdey.in:
+
+**A Records:**
+```
+Type: A
+Name: @ (root domain)
+IPv4 address: YOUR_VPS_IP_ADDRESS
+Proxy status: DNS Only (grey cloud)
+TTL: Auto
+Comment: Direct access for admin panel
+
+Type: A  
+Name: pydetective
+IPv4 address: YOUR_VPS_IP_ADDRESS
+Proxy status: Proxied (orange cloud)
+TTL: Auto
+Comment: Main application domain
+
+Type: A
+Name: www
+IPv4 address: YOUR_VPS_IP_ADDRESS
+Proxy status: Proxied (orange cloud)
+TTL: Auto
+Comment: WWW redirect to main domain
+
+Type: A
+Name: cp
+IPv4 address: YOUR_VPS_IP_ADDRESS
+Proxy status: DNS Only (grey cloud)
+TTL: Auto
+Comment: CloudPanel admin access
+```
+
+**AAAA Records (IPv6 - disable if not using IPv6):**
+```
+Type: AAAA
+Name: @
+IPv6 address: :: (leave blank)
+Proxy status: DNS Only (grey cloud)
+TTL: Auto
+
+Type: AAAA
+Name: pydetective
+IPv6 address: :: (leave blank)
+Proxy status: DNS Only (grey cloud)
+TTL: Auto
+```
+
+**Additional Records:**
+```
+Type: CNAME
+Name: admin
+Target: cp.pydetective.dipteshdey.in
+Proxy status: DNS Only (grey cloud)
+TTL: Auto
+Comment: Admin panel alternative access
+
+Type: TXT
+Name: @
+Content: v=spf1 include:_spf.cloudflare.net ~all
+TTL: Auto
+Comment: SPF record for email (if using)
+```
+
+**TTL Recommendations:**
+- A records: Auto (usually 300 seconds)
+- TXT records: 3600 seconds
+- CNAME records: Auto
+
+## Cloudflare SSL/TLS Configuration
+
+**Step 1: Configure SSL Mode**
+1. In Cloudflare dashboard -> SSL/TLS -> Overview
+2. Select "Full (Strict)" mode
+3. Ensure "Automatic HTTPS Rewrites" is enabled
+4. Enable "Always Use HTTPS"
+5. Enable "HSTS" (if you're sure about HTTPS-only)
+
+**Step 2: Generate Origin Certificate**
+1. Go to SSL/TLS -> Origin Server -> Create Certificate
+2. Configure:
+   - Hostnames: *.pydetective.dipteshdey.in, pydetective.dipteshdey.in
+   - Certificate Type: RSA (2048)
+   - Validity: 15 years (maximum)
+3. Download: certificate.pem and private_key.pem
+4. Store securely offline as backup
+
+**Step 3: Install Certificate on Server**
+```bash
+# Create SSL directory structure
+sudo mkdir -p /etc/cloudpanel/ssl/pydetective.dipteshdey.in
+sudo chown root:root /etc/cloudpanel/ssl/pydetective.dipteshdey.in
+sudo chmod 755 /etc/cloudpanel/ssl/pydetective.dipteshdey.in
+
+# Upload certificate files (secure method)
+# Using nano to paste content directly
+sudo nano /etc/cloudpanel/ssl/pydetective.dipteshdey.in/certificate.pem
+# Paste entire certificate content from Cloudflare
+
+sudo nano /etc/cloudpanel/ssl/pydetective.dipteshdey.in/private_key.pem
+# Paste entire private key content from Cloudflare
+
+# Set proper permissions
+sudo chmod 644 /etc/cloudpanel/ssl/pydetective.dipteshdey.in/certificate.pem
+sudo chmod 600 /etc/cloudpanel/ssl/pydetective.dipteshdey.in/private_key.pem
+sudo chown root:root /etc/cloudpanel/ssl/pydetective.dipteshdey.in/*
+
+# Verify certificate syntax
+sudo openssl x509 -in /etc/cloudpanel/ssl/pydetective.dipteshdey.in/certificate.pem -text -noout
+sudo openssl rsa -in /etc/cloudpanel/ssl/pydetective.dipteshdey.in/private_key.pem -check
+```
+
+**Step 4: Configure CloudPanel SSL**
+1. In CloudPanel dashboard -> Sites -> Add Site
+2. Domain: pydetective.dipteshdey.in
+3. PHP Version: 8.1+
+4. SSL Certificate -> Custom
+5. Certificate: /etc/cloudpanel/ssl/pydetective.dipteshdey.in/certificate.pem
+6. Private Key: /etc/cloudpanel/ssl/pydetective.dipteshdey.in/private_key.pem
+
+**Step 5: Verify SSL Configuration**
+```bash
+# Test SSL certificate
+sudo nginx -t
+sudo systemctl reload nginx
+
+# Check SSL details
+openssl s_client -connect pydetective.dipteshdey.in:443 -servername pydetective.dipteshdey.in
+
+# Cloudflare diagnostic
+curl -I https://pydetective.dipteshdey.in
+```
+
+## Website Deployment
+
+**Step 1: Create Site in CloudPanel**
+1. Login to CloudPanel at https://YOUR_IP:8443
+2. Navigate to Sites -> Add Site
+3. Select: PHP Site
+4. Domain: pydetective.dipteshdey.in
+5. PHP Version: 8.1 (or latest stable)
+6. Database: MySQL (create during setup)
+7. SSL: Custom (use Cloudflare certificates)
+8. Click Add Site
+
+**Step 2: Configure Directory Structure**
+```bash
+# Navigate to site document root
+cd /home/cloudpanel/htdocs/pydetective.dipteshdey.in
+
+# Create application directory structure
+mkdir -p public api engine storage logs
+mkdir -p public/assets/css public/assets/js public/assets/images
+mkdir -p public/uploads public/cache
+mkdir -p storage/logs storage/sessions storage/backups
+mkdir -p api/public api/config api/controllers api/models api/utils
+
+# Set proper ownership and permissions
+sudo chown -R cloudpanel:cloudpanel /home/cloudpanel/htdocs/pydetective.dipteshdey.in
+sudo chmod -R 755 /home/cloudpanel/htdocs/pydetective.dipteshdey.in
+sudo chmod -R 775 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/uploads
+sudo chmod -R 775 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage
+sudo chmod -R 755 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api
+sudo chmod -R 644 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/config
+```
+
+**Step 3: Upload Application Files**
+
+Method A: Direct Upload (for small applications)
+```bash
+# Upload frontend build files
+scp -r dist/* admin@YOUR_IP:/home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/
+
+# Upload API files
+scp -r api/* admin@YOUR_IP:/home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/
+
+# Upload Python engine
+scp engine/runner.py admin@YOUR_IP:/home/cloudpanel/htdocs/pydetective.dipteshdey.in/engine/
+```
+
+Method B: Git Clone (recommended for ongoing development)
+```bash
+# Install Git if not present
+sudo apt install git -y
+
+# Clone repository
+cd /home/cloudpanel/htdocs/pydetective.dipteshdey.in
+sudo -u cloudpanel git clone https://github.com/your-repo.git temp-repo
+
+# Move files to correct locations
+sudo -u cloudpanel cp -r temp-repo/client/dist/* public/
+sudo -u cloudpanel cp -r temp-repo/api/* api/
+sudo -u cloudpanel cp -r temp-repo/engine/* engine/
+sudo -u cloudpanel cp -r temp-repo/sql/* storage/
+
+# Set permissions again
+sudo chown -R cloudpanel:cloudpanel /home/cloudpanel/htdocs/pydetective.dipteshdey.in
+sudo chmod -R 755 /home/cloudpanel/htdocs/pydetective.dipteshdey.in
+
+# Cleanup temporary repo
+sudo rm -rf temp-repo
+```
+
+## Database Setup (MySQL)
+
+**Step 1: Secure MySQL Installation**
+```bash
+# Run MySQL security script
+sudo mysql_secure_installation
+
+# Recommended answers:
+# Validate Password Component? No
+# Set root password? Yes (use strong password)
+# Remove anonymous users? Yes
+# Disallow root login remotely? Yes
+# Remove test database? Yes
+# Reload privilege tables? Yes
+```
+
+**Step 2: Create Application Database and User**
+```bash
+# Login to MySQL as root
+mysql -u root -p
+```
+
+Execute these SQL commands:
+```sql
+-- Create database with UTF-8 support
+CREATE DATABASE IF NOT EXISTS python_detective 
+CHARACTER SET utf8mb4 
+COLLATE utf8mb4_unicode_ci;
+
+-- Create dedicated application user with limited privileges
+CREATE USER 'pydetective_user'@'localhost' 
+IDENTIFIED BY 'StrongRandomPassword123!@#';
+
+-- Grant specific permissions (not all privileges)
+GRANT SELECT, INSERT, UPDATE, DELETE ON python_detective.* TO 'pydetective_user'@'localhost';
+GRANT CREATE TEMPORARY TABLES ON python_detective.* TO 'pydetective_user'@'localhost';
+GRANT INDEX ON python_detective.* TO 'pydetective_user'@'localhost';
+
+-- Apply changes
+FLUSH PRIVILEGES;
+
+-- Verify setup
+SHOW DATABASES;
+SHOW GRANTS FOR 'pydetective_user'@'localhost';
+
+EXIT;
+```
+
+**Step 3: Import Database Schema and Data**
+```bash
+# Navigate to SQL files location
+cd /home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage
+
+# Import schema
+mysql -u pydetective_user -p python_detective < schema.sql
+
+# Import seed data (run all seed files)
+mysql -u pydetective_user -p python_detective < seeds_01_10.sql
+mysql -u pydetective_user -p python_detective < seeds_11_20.sql
+mysql -u pydetective_user -p python_detective < seeds_21_30.sql
+
+# Verify data import
+mysql -u pydetective_user -p -e "USE python_detective; SELECT COUNT(*) as total_cases FROM cases;"
+```
+
+**Step 4: Configure Application Database Connection**
+```bash
+# Create environment configuration file
+sudo nano /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/config/database.php
+```
+
+PHP database configuration:
+```php
+<?php
+class Database {
+    private $host = "localhost";
+    private $db_name = "python_detective";
+    private $username = "pydetective_user";
+    private $password = "StrongRandomPassword123!@#";
+    public $conn;
+    public $last_error = null;
+
+    public function getConnection() {
+        $this->conn = null;
+        $this->last_error = null;
+        
+        try {
+            $this->conn = new PDO(
+                "mysql:host=" . $this->host . ";dbname=" . $this->db_name . ";charset=utf8mb4",
+                $this->username,
+                $this->password,
+                [
+                    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4"
+                ]
+            );
+        } catch(PDOException $exception) {
+            $this->last_error = $exception->getMessage();
+        }
+        
+        return $this->conn;
+    }
+}
+?>
+```
+
+**Step 5: Secure Database Access**
+```bash
+# Restrict database access to application user only
+sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
+```
+
+Add security settings:
+```ini
+[mysqld]
+# Bind to localhost only (prevents external access)
+bind-address = 127.0.0.1
+
+# Disable SHOW DATABASES for security
+skip-show-database
+
+# Performance tuning for 1GB RAM
+innodb_buffer_pool_size = 256M
+innodb_log_file_size = 64M
+max_connections = 50
+query_cache_size = 32M
+query_cache_type = 1
+```
+
+```bash
+# Restart MySQL with new configuration
+sudo systemctl restart mysql
+sudo systemctl status mysql
+```
+
+## Backend Configuration (PHP)
+
+**Step 1: Install Required PHP Extensions**
+```bash
+# Install essential PHP extensions
+sudo apt install php8.1-mysql php8.1-json php8.1-curl php8.1-mbstring php8.1-zip php8.1-bcmath php8.1-intl php8.1-gd php8.1-xml php8.1-opcache -y
+
+# Install PHP extensions for security and performance
+sudo apt install php8.1-apcu php8.1-imagick -y
+```
+
+**Step 2: Configure PHP for Production**
+```bash
+# Edit PHP-FPM configuration
+sudo nano /etc/php/8.1/fpm/php.ini
+```
+
+Optimize PHP settings for 1GB RAM:
+```ini
+; Resource Limits
+memory_limit = 128M
+max_execution_time = 30
+max_input_time = 30
+upload_max_filesize = 5M
+post_max_size = 8M
+max_file_uploads = 10
+
+; Performance tuning for low memory
+opcache.enable = 1
+opcache.memory_consumption = 64
+opcache.max_accelerated_files = 4000
+opcache.revalidate_freq = 60
+opcache.validate_timestamps = 1
+
+; Security settings
+display_errors = Off
+log_errors = On
+error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
+expose_php = Off
+allow_url_fopen = Off
+allow_url_include = Off
+
+; Session security
+session.cookie_httponly = 1
+session.cookie_secure = 1
+session.use_only_cookies = 1
+```
+
+**Step 3: Configure PHP-FPM for Low Memory**
+```bash
+# Edit PHP-FPM pool configuration
+sudo nano /etc/php/8.1/fpm/pool.d/www.conf
+```
+
+Configure FPM settings:
+```ini
+[www]
+user = cloudpanel
+group = cloudpanel
+listen = /run/php/php8.1-fpm.sock
+listen.owner = www-data
+listen.group = www-data
+
+; Process management for 1GB RAM
+pm = dynamic
+pm.max_children = 10
+pm.start_servers = 2
+pm.min_spare_servers = 2
+pm.max_spare_servers = 4
+pm.max_requests = 500
+
+; Security
+request_terminate_timeout = 30s
+request_slowlog_timeout = 5s
+slowlog = /var/log/php8.1-fpm-slow.log
+```
+
+**Step 4: Restart PHP Services**
+```bash
+sudo systemctl restart php8.1-fpm
+sudo systemctl enable php8.1-fpm
+sudo systemctl status php8.1-fpm
+```
+
+**Step 5: Configure Nginx vhost for PHP API**
+In CloudPanel -> Sites -> pydetective.dipteshdey.in -> Vhost -> Custom:
+
+```nginx
+# PHP API Configuration
+location /api/ {
+    alias /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/public/;
+    try_files $uri $uri/ /api/public/index.php?$query_string;
+    
+    # Security headers for API
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    
+    # PHP processing
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $request_filename;
+        include fastcgi_params;
+        
+        # Security for PHP
+        fastcgi_read_timeout 30;
+        fastcgi_send_timeout 30;
+        client_max_body_size 5M;
+    }
+}
+
+# Block direct access to sensitive files
+location ~ /\.(env|git|svn) {
+    deny all;
+    return 404;
+}
+
+location ^~ /(config|storage|engine)/ {
+    deny all;
+    return 404;
+}
+```
+
+**Step 6: Configure Python Sandbox Execution**
+```bash
+# Install Python 3.11+ for sandbox
+sudo apt install python3.11 python3.11-pip python3.11-venv -y
+
+# Create sandbox environment
+sudo mkdir -p /opt/python-sandbox
+sudo chown cloudpanel:cloudpanel /opt/python-sandbox
+cd /opt/python-sandbox
+
+# Create virtual environment for sandbox
+python3.11 -m venv sandbox-env
+source sandbox-env/bin/activate
+pip install --no-cache-dir -r /home/cloudpanel/htdocs/pydetective.dipteshdey.in/engine/requirements.txt
+
+# Set permissions for sandbox
+sudo chmod 750 /opt/python-sandbox
+sudo chmod +x /home/cloudpanel/htdocs/pydetective.dipteshdey.in/engine/runner.py
+```
+
+## Cloudflare + Nginx Hardening
+
+**Step 1: Configure Real IP Headers**
+In CloudPanel -> Sites -> pydetective.dipteshdey.in -> Vhost -> Custom:
+
+```nginx
+# Cloudflare Real IP Configuration
+set_real_ip_from 103.21.244.0/22;
+set_real_ip_from 103.22.200.0/22;
+set_real_ip_from 103.31.4.0/22;
+set_real_ip_from 104.16.0.0/13;
+set_real_ip_from 104.24.0.0/14;
+set_real_ip_from 108.162.192.0/18;
+set_real_ip_from 131.0.72.0/22;
+set_real_ip_from 141.101.64.0/18;
+set_real_ip_from 145.89.150.224/28;
+set_real_ip_from 146.75.30.192/28;
+set_real_ip_from 146.75.231.192/28;
+set_real_ip_from 162.158.0.0/15;
+set_real_ip_from 172.64.0.0/13;
+set_real_ip_from 173.245.48.0/20;
+set_real_ip_from 188.114.96.0/20;
+set_real_ip_from 190.93.240.0/20;
+set_real_ip_from 197.234.240.0/22;
+set_real_ip_from 198.41.128.0/17;
+real_ip_header CF-Connecting-IP;
+
+# Use remote IP if Cloudflare header missing
+real_ip_recursive on;
+```
+
+**Step 2: Implement Rate Limiting**
+```nginx
+# Rate limiting zones
+limit_req_zone $binary_remote_addr zone=api_submissions:10m rate=5r/s;
+limit_req_zone $binary_remote_addr zone=login_attempts:10m rate=1r/s;
+limit_req_zone $binary_remote_addr zone=general_requests:10m rate=20r/s;
+
+# Apply rate limiting to specific endpoints
+location /api/submit {
+    limit_req zone=api_submissions burst=10 nodelay;
+    # Pass to PHP API configuration
+}
+
+location /api/auth/login {
+    limit_req zone=login_attempts burst=3 nodelay;
+    # Pass to PHP API configuration
+}
+
+location / {
+    limit_req zone=general_requests burst=40 nodelay;
+    # Default location configuration
+}
+```
+
+**Step 3: Add Comprehensive Security Headers**
+```nginx
+# Content Security Policy
+add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.cloudflare.com; frame-ancestors 'none'; form-action 'self';" always;
+
+# Other security headers
+add_header X-Frame-Options DENY always;
+add_header X-Content-Type-Options nosniff always;
+add_header X-XSS-Protection "1; mode=block" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+# Remove server information
+server_tokens off;
+more_clear_headers Server;
+more_clear_headers X-Powered-By;
+
+# Control caching
+location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    add_header X-Content-Type-Options nosniff;
+}
+
+# Block suspicious user agents
+if ($http_user_agent ~* (bot|crawl|spider|scraper)) {
+    return 403;
+}
+
+# Block common attack patterns
+if ($request_uri ~* "(\.php\?|admin|wp-admin|wp-login)") {
+    return 403;
+}
+```
+
+**Step 4: File Upload Security**
+```nginx
+# Secure file upload handling
+location ~* \.(php|pl|py|jsp|asp|sh|cgi)$ {
+    deny all;
+}
+
+location /public/uploads/ {
+    # Only allow specific file types
+    location ~* \.(jpg|jpeg|png|gif|webp|pdf|txt)$ {
+        expires 30d;
+        add_header Cache-Control "public";
+    }
+    
+    # Block all other files
+    location ~* \.(php|pl|py|jsp|asp|sh|cgi|exe|bat|cmd|com|pif)$ {
+        deny all;
+    }
+}
+```
+
+**Step 5: Performance Optimization**
+```nginx
+# Enable gzip compression
+gzip on;
+gzip_vary on;
+gzip_min_length 1024;
+gzip_comp_level 6;
+gzip_types
+    text/plain
+    text/css
+    text/xml
+    text/javascript
+    application/json
+    application/javascript
+    application/xml+rss
+    application/atom+xml
+    image/svg+xml;
+
+# Browser caching
+location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    access_log off;
+}
+
+# Disable logging for static assets
+location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+    access_log off;
+    log_not_found off;
+}
+```
+
+## Common Errors & Fixes
+
+**Cloudflare 502 Bad Gateway**
+
+Symptoms: Server responds with 502 error when accessing through Cloudflare
+Root Causes:
+1. CloudPanel services not running
+2. SSL certificate misconfiguration
+3. PHP-FPM process issues
+4. Resource exhaustion
+
+Solutions:
+```bash
+# Check service status
+sudo systemctl status nginx
+sudo systemctl status php8.1-fpm
+sudo systemctl status mysql
+
+# Restart services if needed
+sudo systemctl restart nginx
+sudo systemctl restart php8.1-fpm
+
+# Check Nginx configuration
+sudo nginx -t
+sudo tail -f /var/log/nginx/error.log
+
+# Check PHP-FPM logs
+sudo tail -f /var/log/php8.1-fpm.log
+
+# Check memory usage
+free -h
+df -h
+
+# Temporarily bypass Cloudflare to test direct connection
+# Set Cloudflare DNS to DNS Only (grey cloud) for testing
+curl -I http://YOUR_IP
+```
+
+**Dark/Blank Screen on Frontend**
+
+Symptoms: Page loads but shows blank or dark screen
+Root Causes:
+1. JavaScript errors in browser console
+2. React Router misconfiguration
+3. Static asset loading issues
+4. Content-Security-Policy too restrictive
+
+Solutions:
+```bash
+# Check browser console for JavaScript errors
+# Press F12 -> Console tab and reload page
+
+# Verify asset loading via curl
+curl -I https://pydetective.dipteshdey.in/assets/
+curl -I https://pydetective.dipteshdey.in/index.html
+
+# Check React build configuration
+cat /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/index.html
+
+# Temporarily relax CSP for testing
+# Remove CSP header from Nginx config and restart nginx
+
+# Check React Router basename
+grep -r "basename" /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/
+```
+
+**SSL Handshake Failure**
+
+Symptoms: SSL error when accessing site
+Root Causes:
+1. Certificate file permission issues
+2. Certificate chain incomplete
+3. Certificate expired or invalid
+4. Cloudflare SSL mode mismatch
+
+Solutions:
+```bash
+# Verify certificate files
+sudo openssl x509 -in /etc/cloudpanel/ssl/pydetective.dipteshdey.in/certificate.pem -text -noout
+sudo openssl rsa -in /etc/cloudpanel/ssl/pydetective.dipteshdey.in/private_key.pem -check
+
+# Check file permissions
+ls -la /etc/cloudpanel/ssl/pydetective.dipteshdey.in/
+
+# Test SSL manually
+openssl s_client -connect pydetective.dipteshdey.in:443 -servername pydetective.dipteshdey.in
+
+# Regenerate certificates if needed
+# Download new certificates from Cloudflare and replace
+
+# Verify Cloudflare SSL mode is "Full (Strict)"
+```
+
+**Mixed Content Errors**
+
+Symptoms: Browser console shows mixed content warnings, some assets not loading
+Root Causes:
+1. HTTP URLs in HTTPS page
+2. Hard-coded HTTP links in code
+3. Cloudflare SSL mode not "Full"
+4. Insecure content being loaded
+
+Solutions:
+```bash
+# Find HTTP references in code
+grep -r "http://" /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/
+
+# Check Nginx configuration for HTTP redirects
+grep -r "http://" /etc/nginx/
+
+# Ensure Cloudflare SSL mode is Full (Strict)
+# Enable "Automatic HTTPS Rewrites" in Cloudflare
+
+# Add HTTP to HTTPS redirect
+# In Cloudflare -> Page Rules -> Create Page Rule:
+# URL: http://pydetective.dipteshdey.in/*
+# Setting: Forwarding URL -> https://pydetective.dipteshdey.in/$1
+```
+
+**API Working But Frontend Not Loading**
+
+Symptoms: API endpoints respond correctly but frontend shows errors
+Root Causes:
+1. CORS issues
+2. API endpoint URL misconfiguration
+3. React Router basename incorrect
+4. Nginx SPA routing not configured
+
+Solutions:
+```bash
+# Test API endpoints directly
+curl -X POST https://pydetective.dipteshdey.in/api/test
+curl -I https://pydetective.dipteshdey.in/api/
+
+# Check API configuration in frontend
+grep -r "api" /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/
+
+# Ensure proper CORS headers in Nginx
+# Add to API location block:
+add_header Access-Control-Allow-Origin "https://pydetective.dipteshdey.in" always;
+add_header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS" always;
+add_header Access-Control-Allow-Headers "Content-Type, Authorization" always;
+
+# Configure SPA routing in Nginx
+location / {
+    try_files $uri $uri/ /index.html?$query_string;
+}
+```
+
+## Final Go-Live Checklist
+
+**Security Checklist**
+- [ ] Root SSH login disabled
+- [ ] Password authentication disabled, key-based auth enabled
+- [ ] UFW firewall configured and active
+- [ ] Fail2ban installed and monitoring
+- [ ] SSL/TLS certificates properly installed (Full Strict)
+- [ ] Security headers implemented (HSTS, CSP, X-Frame-Options)
+- [ ] Rate limiting configured for API endpoints
+- [ ] Real IP headers configured for Cloudflare
+- [ ] Database uses least-privilege user access
+- [ ] Sensitive files blocked from web access
+- [ ] Server software versions up to date
+- [ ] Cloudflare WAF rules configured
+- [ ] Two-factor authentication enabled where possible
+
+**Performance Checklist**
+- [ ] 2GB swap file created and active
+- [ ] Memory optimization settings applied
+- [ ] PHP-FPM configured for 1GB RAM
+- [ ] Nginx gzip compression enabled
+- [ ] Static asset caching configured
+- [ ] Database optimization settings applied
+- [ ] Cloudflare CDN caching enabled
+- [ ] Image optimization implemented
+- [ ] Resource monitoring set up
+
+**Backup Checklist**
+- [ ] Daily database backups configured in CloudPanel
+- [ ] Weekly full site backups scheduled
+- [ ] SSL certificates backed up securely
+- [ ] Configuration files version controlled
+- [ ] Off-site backup strategy implemented
+- [ ] Backup restoration tested
+- [ ] Backup retention policy defined
+
+**Monitoring Checklist**
+- [ ] System resource usage monitoring (top, htop, glances)
+- [ ] Application error logging configured
+- [ ] Nginx access and error logs monitoring
+- [ ] PHP-FPM slow log monitoring
+- [ ] MySQL slow query log enabled
+- [ ] Disk space monitoring with alerts
+- [ ] Uptime monitoring configured (UptimeRobot/Pingdom)
+- [ ] Cloudflare analytics dashboard configured
+- [ ] Log rotation configured to prevent disk fill
+- [ ] Alert thresholds defined for critical metrics
+
+## Maintenance & Scaling Tips
+
+**Log Rotation Configuration**
+```bash
+# Configure logrotate for application logs
+sudo nano /etc/logrotate.d/pydetective
+```
+
+```
+/home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 cloudpanel cloudpanel
+    postrotate
+        # Restart any services if needed
+    endscript
+}
+
+/var/log/nginx/*.log {
+    daily
+    missingok
+    rotate 30
+    compress
+    delaycompress
+    notifempty
+    create 644 root adm
+    postrotate
+        systemctl reload nginx
+    endscript
+}
+
+/var/log/php8.1-fpm.log {
+    weekly
+    missingok
+    rotate 12
+    compress
+    delaycompress
+    notifempty
+    create 644 root adm
+    postrotate
+        systemctl reload php8.1-fpm
+    endscript
+}
+```
+
+```bash
+# Test log rotation
+sudo logrotate -d /etc/logrotate.d/pydetective
+sudo logrotate -f /etc/logrotate.d/pydetective
+```
+
+**Database Maintenance Tasks**
+```bash
+# Create daily database maintenance script
+sudo nano /usr/local/bin/db-maintenance.sh
+```
+
+```bash
+#!/bin/bash
+DATE=$(date +%Y-%m-%d)
+LOG_FILE="/home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/db-maintenance-$DATE.log"
+
+echo "Database Maintenance Started: $(date)" >> $LOG_FILE
+
+# Optimize tables
+mysql -u pydetective_user -pStrongPassword123 python_detective <<EOF >> $LOG_FILE 2>&1
+OPTIMIZE TABLE users;
+OPTIMIZE TABLE cases;
+OPTIMIZE TABLE submissions;
+OPTIMIZE TABLE user_progress;
+SHOW TABLE STATUS;
+EOF
+
+# Update statistics
+mysql -u pydetective_user -pStrongPassword123 python_detective -e "ANALYZE TABLE users, cases, submissions, user_progress;" >> $LOG_FILE 2>&1
+
+echo "Database Maintenance Completed: $(date)" >> $LOG_FILE
+```
+
+```bash
+# Make script executable and add to crontab
+sudo chmod +x /usr/local/bin/db-maintenance.sh
+sudo crontab -e
+```
+
+Add to crontab:
+```
+# Database maintenance - every Sunday at 2 AM
+0 2 * * 0 /usr/local/bin/db-maintenance.sh
+
+# Clear old log files - daily at 3 AM
+0 3 * * * find /home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs -name "*.log" -mtime +30 -delete
+
+# Monitor disk space - hourly
+0 * * * * df -h >> /home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/disk-usage.log
+```
+
+**System Updates and Security**
+```bash
+# Create security update script
+sudo nano /usr/local/bin/security-updates.sh
+```
+
+```bash
+#!/bin/bash
+LOG_FILE="/home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/security-updates-$(date +%Y-%m-%d).log"
+
+echo "Security Updates Started: $(date)" >> $LOG_FILE
+
+# Update package lists
+apt update >> $LOG_FILE 2>&1
+
+# Install security updates only
+apt upgrade -s | grep -i security >> $LOG_FILE 2>&1
+
+# Check for pending reboot
+if [ -f /var/run/reboot-required ]; then
+    echo "System requires reboot after updates" >> $LOG_FILE
+fi
+
+echo "Security Updates Completed: $(date)" >> $LOG_FILE
+```
+
+```bash
+sudo chmod +x /usr/local/bin/security-updates.sh
+sudo crontab -e
+```
+
+Add to crontab:
+```
+# Security check - every Monday at 1 AM
+0 1 * * 1 /usr/local/bin/security-updates.sh
+```
+
+**Performance Monitoring Setup**
+```bash
+# Install monitoring tools
+sudo apt install htop iotop nethogs -y
+
+# Create performance monitoring script
+sudo nano /usr/local/bin/perf-monitor.sh
+```
+
+```bash
+#!/bin/bash
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+LOG_FILE="/home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/perf-monitor-$DATE.log"
+
+echo "Performance Monitor: $(date)" >> $LOG_FILE
+echo "=== Memory Usage ===" >> $LOG_FILE
+free -h >> $LOG_FILE
+
+echo -e "\n=== CPU Usage ===" >> $LOG_FILE
+top -bn1 | head -20 >> $LOG_FILE
+
+echo -e "\n=== Disk Usage ===" >> $LOG_FILE
+df -h >> $LOG_FILE
+
+echo -e "\n=== Network Connections ===" >> $LOG_FILE
+netstat -an | grep :80 | wc -l >> $LOG_FILE
+netstat -an | grep :443 | wc -l >> $LOG_FILE
+
+echo -e "\n=== Service Status ===" >> $LOG_FILE
+systemctl is-active nginx >> $LOG_FILE
+systemctl is-active php8.1-fpm >> $LOG_FILE
+systemctl is-active mysql >> $LOG_FILE
+```
+
+```bash
+sudo chmod +x /usr/local/bin/perf-monitor.sh
+sudo crontab -e
+```
+
+Add to crontab:
+```
+# Performance monitoring - every 6 hours
+0 */6 * * * /usr/local/bin/perf-monitor.sh
+```
+
+**When and How to Scale Beyond 1GB RAM**
+
+**Monitoring Thresholds for Scaling:**
+- Consistent memory usage > 80% (800MB sustained)
+- Swap usage > 25% continuously
+- PHP-FPM slow log entries increasing
+- MySQL query times > 100ms average
+- High OOM kill frequency in logs
+- Nginx 502 errors during peak traffic
+
+**Scaling Recommendations:**
+
+**1-2GB RAM Upgrade:**
+```bash
+# Update PHP-FPM settings for 2GB RAM
+sudo nano /etc/php/8.1/fpm/pool.d/www.conf
+```
+
+```
+pm.max_children = 20
+pm.start_servers = 4
+pm.min_spare_servers = 4
+pm.max_spare_servers = 8
+```
+
+```bash
+# Update MySQL settings for 2GB RAM
+sudo nano /etc/mysql/mysql.conf.d/mysqld.cnf
+```
+
+```
+innodb_buffer_pool_size = 512M
+innodb_log_file_size = 128M
+max_connections = 100
+query_cache_size = 64M
+```
+
+**2-4GB RAM Upgrade:**
+- Implement Redis for caching
+- Separate application and database servers
+- Load balancer configuration
+- Additional web servers for horizontal scaling
+
+**Advanced Scaling (4GB+):**
+- Microservices architecture
+- Container orchestration with Docker/Kubernetes
+- Database replication and sharding
+- CDN optimization and edge computing
+
+**Backup Disaster Recovery Plan:**
+```bash
+# Create comprehensive backup script
+sudo nano /usr/local/bin/backup-all.sh
+```
+
+```bash
+#!/bin/bash
+BACKUP_DIR="/home/cloudpanel/backups/$(date +%Y-%m-%d)"
+mkdir -p $BACKUP_DIR
+
+# Backup database
+mysqldump -u pydetective_user -pStrongPassword123 python_detective | gzip > $BACKUP_DIR/database.sql.gz
+
+# Backup application files
+tar -czf $BACKUP_DIR/application.tar.gz /home/cloudpanel/htdocs/pydetective.dipteshdey.in
+
+# Backup configuration files
+tar -czf $BACKUP_DIR/config.tar.gz /etc/nginx /etc/php/8.1 /etc/mysql /etc/cloudpanel
+
+# Upload to external storage (if configured)
+# rsync -avz $BACKUP_DIR/ user@backup-server:/backups/pydetective/
+
+echo "Backup completed: $(date) - $BACKUP_DIR"
+```
+
+This comprehensive setup ensures production-ready deployment, security, and maintainability for your Python Detective Game on a resource-constrained VPS.
