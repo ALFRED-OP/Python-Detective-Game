@@ -385,10 +385,10 @@ mkdir -p api/public api/config api/controllers api/models api/utils
 # Set proper ownership and permissions
 sudo chown -R cloudpanel:cloudpanel /home/cloudpanel/htdocs/pydetective.dipteshdey.in
 sudo chmod -R 755 /home/cloudpanel/htdocs/pydetective.dipteshdey.in
-sudo chmod -R 775 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/uploads
-sudo chmod -R 775 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage
-sudo chmod -R 755 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api
-sudo chmod -R 644 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/config
+sudo chmod -R 775 /home/alfred/htdocs/pydetective.dipteshdey.in/public/uploads
+sudo chmod -R 775 /home/alfred/htdocs/pydetective.dipteshdey.in/storage
+sudo chmod -R 755 /home/alfred/htdocs/pydetective.dipteshdey.in/api
+sudo chmod -R 644 /home/alfred/htdocs/pydetective.dipteshdey.in/api/config
 ```
 
 **Step 3: Upload Application Files**
@@ -396,13 +396,13 @@ sudo chmod -R 644 /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/config
 Method A: Direct Upload (for small applications)
 ```bash
 # Upload frontend build files
-scp -r dist/* admin@YOUR_IP:/home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/
+scp -r dist/* admin@YOUR_IP:/home/alfred/htdocs/pydetective.dipteshdey.in/public/
 
 # Upload API files
-scp -r api/* admin@YOUR_IP:/home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/
+scp -r api/* admin@YOUR_IP:/home/alfred/htdocs/pydetective.dipteshdey.in/api/
 
 # Upload Python engine
-scp engine/runner.py admin@YOUR_IP:/home/cloudpanel/htdocs/pydetective.dipteshdey.in/engine/
+scp engine/runner.py admin@YOUR_IP:/home/alfred/htdocs/pydetective.dipteshdey.in/engine/
 ```
 
 Method B: Git Clone (recommended for ongoing development)
@@ -479,7 +479,7 @@ EXIT;
 **Step 3: Import Database Schema and Data**
 ```bash
 # Navigate to SQL files location
-cd /home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage
+cd /home/alfred/htdocs/pydetective.dipteshdey.in/storage
 
 # Import schema
 mysql -u pydetective_user -p python_detective < schema.sql
@@ -496,7 +496,7 @@ mysql -u pydetective_user -p -e "USE python_detective; SELECT COUNT(*) as total_
 **Step 4: Configure Application Database Connection**
 ```bash
 # Create environment configuration file
-sudo nano /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/config/database.php
+sudo nano /home/alfred/htdocs/pydetective.dipteshdey.in/api/config/database.php
 ```
 
 PHP database configuration:
@@ -655,7 +655,7 @@ In CloudPanel -> Sites -> pydetective.dipteshdey.in -> Vhost -> Custom:
 ```nginx
 # PHP API Configuration
 location /api/ {
-    alias /home/cloudpanel/htdocs/pydetective.dipteshdey.in/api/public/;
+    alias /home/alfred/htdocs/pydetective.dipteshdey.in/api/public/;
     try_files $uri $uri/ /api/public/index.php?$query_string;
     
     # Security headers for API
@@ -701,11 +701,11 @@ cd /opt/python-sandbox
 # Create virtual environment for sandbox
 python3.11 -m venv sandbox-env
 source sandbox-env/bin/activate
-pip install --no-cache-dir -r /home/cloudpanel/htdocs/pydetective.dipteshdey.in/engine/requirements.txt
+pip install --no-cache-dir -r /home/alfred/htdocs/pydetective.dipteshdey.in/engine/requirements.txt
 
 # Set permissions for sandbox
 sudo chmod 750 /opt/python-sandbox
-sudo chmod +x /home/cloudpanel/htdocs/pydetective.dipteshdey.in/engine/runner.py
+sudo chmod +x /home/alfred/htdocs/pydetective.dipteshdey.in/engine/runner.py
 ```
 
 ## Cloudflare + Nginx Hardening
@@ -905,13 +905,13 @@ curl -I https://pydetective.dipteshdey.in/assets/
 curl -I https://pydetective.dipteshdey.in/index.html
 
 # Check React build configuration
-cat /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/index.html
+cat /home/alfred/htdocs/pydetective.dipteshdey.in/public/index.html
 
 # Temporarily relax CSP for testing
 # Remove CSP header from Nginx config and restart nginx
 
 # Check React Router basename
-grep -r "basename" /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/
+grep -r "basename" /home/alfred/htdocs/pydetective.dipteshdey.in/public/
 ```
 
 **SSL Handshake Failure**
@@ -953,7 +953,7 @@ Root Causes:
 Solutions:
 ```bash
 # Find HTTP references in code
-grep -r "http://" /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/
+grep -r "http://" /home/alfred/htdocs/pydetective.dipteshdey.in/public/
 
 # Check Nginx configuration for HTTP redirects
 grep -r "http://" /etc/nginx/
@@ -983,7 +983,7 @@ curl -X POST https://pydetective.dipteshdey.in/api/test
 curl -I https://pydetective.dipteshdey.in/api/
 
 # Check API configuration in frontend
-grep -r "api" /home/cloudpanel/htdocs/pydetective.dipteshdey.in/public/
+grep -r "api" /home/alfred/htdocs/pydetective.dipteshdey.in/public/
 
 # Ensure proper CORS headers in Nginx
 # Add to API location block:
@@ -1088,7 +1088,7 @@ sudo nano /etc/logrotate.d/pydetective
 ```
 
 ```
-/home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/*.log {
+/home/alfred/htdocs/pydetective.dipteshdey.in/storage/logs/*.log {
     daily
     missingok
     rotate 30
@@ -1143,7 +1143,7 @@ sudo nano /usr/local/bin/db-maintenance.sh
 ```bash
 #!/bin/bash
 DATE=$(date +%Y-%m-%d)
-LOG_FILE="/home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/db-maintenance-$DATE.log"
+LOG_FILE="/home/alfred/htdocs/pydetective.dipteshdey.in/storage/logs/db-maintenance-$DATE.log"
 
 echo "Database Maintenance Started: $(date)" >> $LOG_FILE
 
@@ -1174,10 +1174,10 @@ Add to crontab:
 0 2 * * 0 /usr/local/bin/db-maintenance.sh
 
 # Clear old log files - daily at 3 AM
-0 3 * * * find /home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs -name "*.log" -mtime +30 -delete
+0 3 * * * find /home/alfred/htdocs/pydetective.dipteshdey.in/storage/logs -name "*.log" -mtime +30 -delete
 
 # Monitor disk space - hourly
-0 * * * * df -h >> /home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/disk-usage.log
+0 * * * * df -h >> /home/alfred/htdocs/pydetective.dipteshdey.in/storage/logs/disk-usage.log
 ```
 
 **System Updates and Security**
@@ -1188,7 +1188,7 @@ sudo nano /usr/local/bin/security-updates.sh
 
 ```bash
 #!/bin/bash
-LOG_FILE="/home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/security-updates-$(date +%Y-%m-%d).log"
+LOG_FILE="/home/alfred/htdocs/pydetective.dipteshdey.in/storage/logs/security-updates-$(date +%Y-%m-%d).log"
 
 echo "Security Updates Started: $(date)" >> $LOG_FILE
 
@@ -1229,7 +1229,7 @@ sudo nano /usr/local/bin/perf-monitor.sh
 ```bash
 #!/bin/bash
 DATE=$(date +%Y-%m-%d_%H-%M-%S)
-LOG_FILE="/home/cloudpanel/htdocs/pydetective.dipteshdey.in/storage/logs/perf-monitor-$DATE.log"
+LOG_FILE="/home/alfred/htdocs/pydetective.dipteshdey.in/storage/logs/perf-monitor-$DATE.log"
 
 echo "Performance Monitor: $(date)" >> $LOG_FILE
 echo "=== Memory Usage ===" >> $LOG_FILE
