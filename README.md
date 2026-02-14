@@ -1,4 +1,4 @@
-# 🕵️ Python Detective Game
+# 🕵️ Python Detective Games
 ### *The Cyber-Noir Murder Mystery Programming Lab*
 
 [![Status](https://img.shields.io/badge/Status-Active_Investigation-00ff41)](https://github.com/ALFRED-OP/Python-Detective-Game)
